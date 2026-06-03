@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Origin Encoder</title>
+</head>
+<body>
+    
+</body>
+<script>
+
+function xorEncode(text, key) {
+    let result = "";
+
+    for (let i = 0; i < text.length; i++) {
+        result += String.fromCharCode(
+            text.charCodeAt(i) ^
+            key.charCodeAt(i % key.length)
+        );
+    }
+
+    return btoa(result);
+}
+
+</script>
+</html>
