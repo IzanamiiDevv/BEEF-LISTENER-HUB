@@ -1,0 +1,25 @@
+{
+  "name": "beef-listener-hub",
+  "version": "1.0.0",
+  "description": "-TEST-",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IzanamiiDevv/BEEF-LISTENER-HUB.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/IzanamiiDevv/BEEF-LISTENER-HUB/issues"
+  },
+  "homepage": "https://github.com/IzanamiiDevv/BEEF-LISTENER-HUB#readme"
+}
