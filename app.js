@@ -387,9 +387,9 @@ function renderPage(listener) {
 <body>
   <div class="container">
     <div class="header">
-      <div class="tag">XOR Cipher</div>
-      <h1>Origin Encoder</h1>
-      <p class="subtitle">// encode text with a symmetric xor key</p>
+      <div class="tag">Route Cipher</div>
+      <h1>BeEF Hub</h1>
+      <p class="subtitle">//hack naten si azhrock</p>
     </div>
 
     <div class="card">
