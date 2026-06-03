@@ -1,12 +1,17 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const cors = require("cors");
 
 const app = express();
 const PORT = 3000;
 const ROUTE_JSON = path.join(__dirname, "api", "route.json");
 
 app.use(express.json());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"]
+}));
 
 /* ─── SSR: serve the page ─────────────────────────────────────────── */
 app.get("/", (req, res) => {
