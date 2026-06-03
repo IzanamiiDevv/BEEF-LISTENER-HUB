@@ -7,15 +7,17 @@ const app = express();
 const PORT = 3000;
 const ROUTE_JSON = path.join(__dirname, "api", "route.json");
 
-app.use(express.json());
-app.use(cors({
+const corsOptions = {
   origin: "*",
-  methods: ["GET", "POST"]
-}));
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+};
 
-/* ─── SSR: serve the page ─────────────────────────────────────────── */
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.use(express.json());
+
 app.get("/", (req, res) => {
-  // Read current listener value so SSR can pre-fill it
   let listener = null;
   try {
     const raw = fs.readFileSync(ROUTE_JSON, "utf8");
@@ -26,7 +28,6 @@ app.get("/", (req, res) => {
   res.send(renderPage(listener));
 });
 
-/* ─── API: write hashed URL to route.json ────────────────────────── */
 app.post("/api/set-listener", (req, res) => {
   const { hashedUrl } = req.body;
 
@@ -45,7 +46,6 @@ app.post("/api/set-listener", (req, res) => {
   }
 });
 
-/* ─── API: read current route.json ───────────────────────────────── */
 app.get("/api/route.json", (req, res) => {
   try {
     const raw = fs.readFileSync(ROUTE_JSON, "utf8");
@@ -55,7 +55,6 @@ app.get("/api/route.json", (req, res) => {
   }
 });
 
-/* ─── SSR template ───────────────────────────────────────────────── */
 function renderPage(listener) {
   const savedBadge = listener
     ? `<div class="saved-badge" id="savedBadge">

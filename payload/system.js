@@ -1,5 +1,5 @@
 const key = "my_secret_key";
-const origin = "BQ0rAxZZXUoWOg4DVAEQLAcADRcXWTceB1cCFy0WCwcXF1o8BAg=";
+const origin = "BQ0rAxZZXUoWOg4DVAEQLAcADRcXWTceB1cCFy0WCwcXF1o8BAhWDAk2XBcMBxERcQEWFgM=";
 
 function xorDecode(encoded, key) {
     const text = atob(encoded);
