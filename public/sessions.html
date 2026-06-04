@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeEF HUB — Active Sessions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #1a1a24;
+      --surface3: #20202e;
+      --border: #2a2a38;
+      --accent: #7b6ef6;
+      --accent2: #e06cff;
+      --text: #f0eeff;
+      --muted: #7070a0;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      overflow-x: hidden;
+    }
+
+    /* grid bg */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      width: 800px; height: 500px;
+      background: radial-gradient(ellipse, rgba(123,110,246,0.14) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ── Nav ── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .nav-brand {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-brand::before {
+      content: '';
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 6px;
+    }
+
+    .nav-link {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      border-color: var(--border);
+      background: var(--surface);
+    }
+
+    .nav-link.active {
+      color: var(--accent);
+      border-color: rgba(123,110,246,0.35);
+      background: rgba(123,110,246,0.07);
+    }
+
+    /* ── Header ── */
+    .header {
+      margin-bottom: 2rem;
+      animation: fadeUp 0.5s 0.05s ease both;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(123,110,246,0.35);
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 1rem;
+    }
+
+    .tag::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text) 40%, var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      margin-top: 0.4rem;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      animation: fadeUp 0.5s 0.1s ease both;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--sans);
+      line-height: 1;
+      transition: color 0.3s;
+    }
+
+    .stat-value.flash { color: var(--success); }
+
+    .stat-label { color: var(--muted); font-size: 11px; }
+
+    /* SSE status pill */
+    .sse-pill {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      border: 1px solid rgba(74,222,128,0.3);
+      background: rgba(74,222,128,0.06);
+      color: var(--success);
+      transition: all 0.3s;
+    }
+
+    .sse-pill.disconnected {
+      border-color: rgba(248,113,113,0.3);
+      background: rgba(248,113,113,0.06);
+      color: var(--danger);
+    }
+
+    .sse-pill.reconnecting {
+      border-color: rgba(251,191,36,0.3);
+      background: rgba(251,191,36,0.06);
+      color: var(--warning);
+    }
+
+    .sse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    .sse-pill.disconnected .sse-dot,
+    .sse-pill.reconnecting .sse-dot { animation: none; }
+
+    /* ── Table card ── */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      animation: fadeUp 0.5s 0.15s ease both;
+      position: relative;
+    }
+
+    .table-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.5;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .table-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .last-update {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    /* Scrollable table wrapper */
+    .table-wrap {
+      overflow-x: auto;
+      min-height: 200px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    thead th {
+      padding: 12px 20px;
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    thead th:first-child { width: 40px; color: transparent; }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(42,42,56,0.6);
+      transition: background 0.15s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+
+    /* Row enter animation */
+    tbody tr.row-enter {
+      animation: rowIn 0.35s ease both;
+    }
+
+    tbody tr.row-exit {
+      animation: rowOut 0.3s ease forwards;
+    }
+
+    tbody tr.row-flash {
+      animation: rowFlash 0.5s ease;
+    }
+
+    td {
+      padding: 14px 20px;
+      vertical-align: middle;
+      color: var(--text);
+    }
+
+    /* Row index */
+    td.row-index {
+      color: var(--muted);
+      font-size: 11px;
+      opacity: 0.5;
+      width: 40px;
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .status-badge::before {
+      content: '';
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-active  { color: var(--success); background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.25); }
+    .status-idle    { color: var(--warning); background: rgba(251,191,36,0.1);  border: 1px solid rgba(251,191,36,0.25); }
+    .status-dead    { color: var(--danger);  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); }
+    .status-unknown { color: var(--muted);   background: rgba(112,112,160,0.1); border: 1px solid rgba(112,112,160,0.25); }
+
+    /* Empty state */
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.5;
+      display: none;
+    }
+
+    .empty-state svg {
+      width: 36px; height: 36px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+      margin-bottom: 12px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateX(-8px); background: rgba(123,110,246,0.08); }
+      to   { opacity: 1; transform: translateX(0);    background: transparent; }
+    }
+
+    @keyframes rowOut {
+      from { opacity: 1; transform: translateX(0);    background: transparent; }
+      to   { opacity: 0; transform: translateX(8px);  background: rgba(248,113,113,0.06); }
+    }
+
+    @keyframes rowFlash {
+      0%   { background: rgba(123,110,246,0.12); }
+      100% { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Nav -->
+  <nav>
+    <a href="/" class="nav-brand">BeEF HUB</a>
+    <div class="nav-links">
+      <a href="/"         class="nav-link">Encoder</a>
+      <a href="/sessions" class="nav-link active">Sessions</a>
+    </div>
+  </nav>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="tag">Live Feed</div>
+    <h1>Active Sessions</h1>
+    <p class="subtitle">// realtime session monitor — updates instantly on change</p>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat">
+      <div>
+        <div class="stat-value" id="statTotal">0</div>
+        <div class="stat-label">Total</div>
+      </div>
+    </div>
+    <div class="stat">
+      <div>
+        <div class="stat-value" id="statActive">0</div>
+        <div class="stat-label">Active</div>
+      </div>
+    </div>
+    <div class="stat">
+      <div>
+        <div class="stat-value" id="statIdle">0</div>
+        <div class="stat-label">Idle</div>
+      </div>
+    </div>
+
+    <div class="sse-pill" id="ssePill">
+      <span class="sse-dot"></span>
+      <span id="sseLabel">connecting…</span>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <span class="table-title">session log</span>
+      <span class="last-update" id="lastUpdate">—</span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="sessionTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Domain</th>
+            <th>Client</th>
+            <th>Temp</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        No sessions found
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ── State ────────────────────────────────────────────────────── */
+  let sessions = [];
+  let columnKeys = [];
+  let eventSource = null;
+
+  /* ── SSE connection ───────────────────────────────────────────── */
+  function connect() {
+    setPill("reconnecting", "connecting…");
+
+    eventSource = new EventSource("/api/sessions/stream");
+
+    eventSource.addEventListener("sessions", (e) => {
+      const incoming = JSON.parse(e.data);
+      handleUpdate(incoming);
+      setPill("connected", "live");
+    });
+
+    eventSource.addEventListener("open", () => {
+      setPill("connected", "live");
+    });
+
+    eventSource.onerror = () => {
+      setPill("disconnected", "disconnected");
+      eventSource.close();
+      // Reconnect after 3s
+      setTimeout(connect, 3000);
+    };
+  }
+
+  /* ── Diffed render ────────────────────────────────────────────── */
+  function handleUpdate(incoming) {
+    // Derive column keys from first object if not yet known
+    if (incoming.length > 0 && columnKeys.length === 0) {
+      columnKeys = Object.keys(incoming[0]);
+      renderHeaders(columnKeys);
+    }
+
+    const tbody = document.getElementById("tableBody");
+    const oldIds = sessions.map(s => JSON.stringify(s));
+    const newIds = incoming.map(s => JSON.stringify(s));
+
+    // Find removed rows — animate out then remove
+    const removedIndices = [];
+    sessions.forEach((s, i) => {
+      if (!newIds.includes(JSON.stringify(s))) removedIndices.push(i);
+    });
+
+    removedIndices.reverse().forEach(i => {
+      const row = tbody.rows[i];
+      if (row) {
+        row.classList.add("row-exit");
+        row.addEventListener("animationend", () => row.remove(), { once: true });
+      }
+    });
+
+    // Rebuild after removals settle
+    setTimeout(() => {
+      sessions = incoming;
+      renderRows(sessions, oldIds);
+      updateStats(sessions);
+      updateTimestamp();
+    }, removedIndices.length > 0 ? 320 : 0);
+  }
+
+  function renderHeaders(keys) {
+    const thead = document.querySelector("#sessionTable thead tr");
+    thead.innerHTML = "<th>#</th>" + keys.map(k =>
+      `<th>${escHtml(k)}</th>`
+    ).join("");
+  }
+
+  function renderRows(data, oldIds) {
+    const tbody = document.getElementById("tableBody");
+    const emptyState = document.getElementById("emptyState");
+
+    if (data.length === 0) {
+      tbody.innerHTML = "";
+      emptyState.style.display = "block";
+      return;
+    }
+
+    emptyState.style.display = "none";
+
+    // Build a map of existing rows by serialized key
+    const existingRows = {};
+    Array.from(tbody.rows).forEach(row => {
+      existingRows[row.dataset.key] = row;
+    });
+
+    const fragment = document.createDocumentFragment();
+
+    data.forEach((session, idx) => {
+      const key = JSON.stringify(session);
+      const isNew = !oldIds.includes(key);
+
+      let row = existingRows[key];
+
+      if (!row) {
+        row = document.createElement("tr");
+        row.dataset.key = key;
+        if (isNew) row.classList.add("row-enter");
+      } else {
+        // Row exists — check if it changed position (flash)
+        delete existingRows[key];
+        row.classList.remove("row-enter", "row-exit");
+      }
+
+      row.innerHTML = buildRowHTML(session, idx);
+      fragment.appendChild(row);
+    });
+
+    tbody.innerHTML = "";
+    tbody.appendChild(fragment);
+  }
+
+  function buildRowHTML(session, idx) {
+    const keys = columnKeys.length > 0 ? columnKeys : Object.keys(session);
+    const cells = keys.map(k => {
+      const val = session[k] ?? "—";
+      if (k.toLowerCase() === "status" || k === "Status") {
+        return `<td>${statusBadge(String(val))}</td>`;
+      }
+      return `<td>${escHtml(String(val))}</td>`;
+    }).join("");
+    return `<td class="row-index">${idx + 1}</td>${cells}`;
+  }
+
+  function statusBadge(val) {
+    const map = {
+      active: "status-active",
+      idle:   "status-idle",
+      dead:   "status-dead"
+    };
+    const cls = map[val.toLowerCase()] || "status-unknown";
+    return `<span class="status-badge ${cls}">${escHtml(val)}</span>`;
+  }
+
+  /* ── Stats ────────────────────────────────────────────────────── */
+  function updateStats(data) {
+    setStatVal("statTotal",  data.length);
+    setStatVal("statActive", data.filter(s => String(s.status || "").toLowerCase() === "active").length);
+    setStatVal("statIdle",   data.filter(s => String(s.status || "").toLowerCase() === "idle").length);
+  }
+
+  function setStatVal(id, val) {
+    const el = document.getElementById(id);
+    if (el.textContent !== String(val)) {
+      el.textContent = val;
+      el.classList.add("flash");
+      setTimeout(() => el.classList.remove("flash"), 600);
+    }
+  }
+
+  /* ── SSE pill ─────────────────────────────────────────────────── */
+  function setPill(state, label) {
+    const pill  = document.getElementById("ssePill");
+    const lbl   = document.getElementById("sseLabel");
+    pill.className = "sse-pill " + (state === "connected" ? "" : state);
+    lbl.textContent = label;
+  }
+
+  /* ── Timestamp ────────────────────────────────────────────────── */
+  function updateTimestamp() {
+    const el = document.getElementById("lastUpdate");
+    const now = new Date();
+    el.textContent = "last update: " + now.toLocaleTimeString();
+  }
+
+  /* ── Helpers ──────────────────────────────────────────────────── */
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  /* ── Boot ─────────────────────────────────────────────────────── */
+  connect();
+</script>
+</body>
+</html>
