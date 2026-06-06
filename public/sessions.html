@@ -4,501 +4,517 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BeEF HUB — Active Sessions</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0a0a0f;
-      --surface: #111118;
-      --surface2: #1a1a24;
-      --surface3: #20202e;
-      --border: #2a2a38;
-      --accent: #7b6ef6;
-      --accent2: #e06cff;
-      --text: #f0eeff;
-      --muted: #7070a0;
-      --success: #4ade80;
-      --warning: #fbbf24;
-      --danger: #f87171;
-      --mono: 'Space Mono', monospace;
-      --sans: 'Syne', sans-serif;
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #1c2128;
+      --border: #30363d;
+      --border2: #21262d;
+      --text: #e6edf3;
+      --text2: #8b949e;
+      --text3: #484f58;
+      --green: #3fb950;
+      --green-dim: #238636;
+      --yellow: #d29922;
+      --red: #f85149;
+      --blue: #58a6ff;
+      --purple: #bc8cff;
+      --cyan: #39d353;
+      --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
     }
 
-    body {
+    html, body {
+      height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: var(--sans);
-      min-height: 100vh;
-      padding: 2rem 1.5rem;
-      overflow-x: hidden;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.5;
     }
 
-    /* grid bg */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 48px 48px;
-      opacity: 0.3;
-      pointer-events: none;
-      z-index: 0;
-    }
-
+    /* ── CRT scanline overlay ── */
     body::after {
       content: '';
       position: fixed;
-      top: -200px; left: 50%;
-      transform: translateX(-50%);
-      width: 800px; height: 500px;
-      background: radial-gradient(ellipse, rgba(123,110,246,0.14) 0%, transparent 70%);
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
       pointer-events: none;
-      z-index: 0;
+      z-index: 9999;
     }
 
-    .page {
-      position: relative;
-      z-index: 1;
-      max-width: 1100px;
+    .terminal {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      max-width: 1200px;
       margin: 0 auto;
+      padding: 0;
     }
 
-    /* ── Nav ── */
-    nav {
+    /* ── Window chrome ── */
+    .win-bar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 2.5rem;
-      animation: fadeUp 0.5s ease both;
+      gap: 12px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .nav-brand {
-      font-family: var(--mono);
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--accent);
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .nav-brand::before {
-      content: '';
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: pulse 2s infinite;
-    }
-
-    .nav-links {
+    .win-dots {
       display: flex;
       gap: 6px;
+      flex-shrink: 0;
     }
 
-    .nav-link {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
+    .win-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+
+    .win-dot.close  { background: #ff5f57; }
+    .win-dot.min    { background: #febc2e; }
+    .win-dot.max    { background: #28c840; }
+
+    .win-title {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text2);
+      letter-spacing: 0.03em;
+    }
+
+    .win-nav {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .win-nav a {
+      color: var(--text2);
       text-decoration: none;
-      padding: 6px 14px;
-      border-radius: 8px;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
       border: 1px solid transparent;
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
+      transition: all 0.15s;
+      letter-spacing: 0.05em;
     }
 
-    .nav-link:hover {
+    .win-nav a:hover {
       color: var(--text);
       border-color: var(--border);
-      background: var(--surface);
+      background: var(--bg3);
     }
 
-    .nav-link.active {
-      color: var(--accent);
-      border-color: rgba(123,110,246,0.35);
-      background: rgba(123,110,246,0.07);
+    .win-nav a.active {
+      color: var(--green);
+      border-color: var(--green-dim);
+      background: rgba(63,185,80,0.06);
     }
 
-    /* ── Header ── */
-    .header {
-      margin-bottom: 2rem;
-      animation: fadeUp 0.5s 0.05s ease both;
-    }
-
-    .tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      border: 1px solid rgba(123,110,246,0.35);
-      padding: 4px 12px;
-      border-radius: 100px;
-      margin-bottom: 1rem;
-    }
-
-    .tag::before {
-      content: '';
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: pulse 2s infinite;
-    }
-
-    h1 {
-      font-size: clamp(1.8rem, 4vw, 2.6rem);
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      background: linear-gradient(135deg, var(--text) 40%, var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .subtitle {
-      margin-top: 0.4rem;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--muted);
-    }
-
-    /* ── Stats bar ── */
-    .stats-bar {
+    /* ── Terminal body ── */
+    .term-body {
+      flex: 1;
+      padding: 20px 24px;
       display: flex;
-      gap: 12px;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      animation: fadeUp 0.5s 0.1s ease both;
+      flex-direction: column;
+      gap: 0;
     }
 
-    .stat {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 18px;
+    /* ── Prompt lines ── */
+    .prompt-line {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-family: var(--mono);
-      font-size: 12px;
-    }
-
-    .stat-value {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--accent);
-      font-family: var(--sans);
-      line-height: 1;
-      transition: color 0.3s;
-    }
-
-    .stat-value.flash { color: var(--success); }
-
-    .stat-label { color: var(--muted); font-size: 11px; }
-
-    /* SSE status pill */
-    .sse-pill {
-      margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      font-family: var(--mono);
-      font-size: 11px;
-      padding: 6px 14px;
-      border-radius: 100px;
-      border: 1px solid rgba(74,222,128,0.3);
-      background: rgba(74,222,128,0.06);
-      color: var(--success);
-      transition: all 0.3s;
-    }
-
-    .sse-pill.disconnected {
-      border-color: rgba(248,113,113,0.3);
-      background: rgba(248,113,113,0.06);
-      color: var(--danger);
-    }
-
-    .sse-pill.reconnecting {
-      border-color: rgba(251,191,36,0.3);
-      background: rgba(251,191,36,0.06);
-      color: var(--warning);
-    }
-
-    .sse-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-      animation: pulse 2s infinite;
-    }
-
-    .sse-pill.disconnected .sse-dot,
-    .sse-pill.reconnecting .sse-dot { animation: none; }
-
-    /* ── Table card ── */
-    .table-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      gap: 0;
+      padding: 2px 0;
+      white-space: nowrap;
       overflow: hidden;
-      animation: fadeUp 0.5s 0.15s ease both;
-      position: relative;
     }
 
-    .table-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      opacity: 0.5;
+    .prompt-user { color: var(--green); }
+    .prompt-at   { color: var(--text2); }
+    .prompt-host { color: var(--blue); }
+    .prompt-sep  { color: var(--text2); margin: 0 2px; }
+    .prompt-path { color: var(--purple); }
+    .prompt-sym  { color: var(--text); margin: 0 8px 0 4px; }
+    .prompt-cmd  { color: var(--text); }
+    .prompt-arg  { color: var(--cyan); margin-left: 6px; }
+
+    /* ── Output block ── */
+    .output-block {
+      margin: 4px 0 16px 0;
+      padding-left: 0;
     }
 
-    .table-toolbar {
+    /* ── Stats row ── */
+    .stats-row {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      gap: 12px;
+      gap: 0;
+      margin: 8px 0 16px 0;
       flex-wrap: wrap;
     }
 
-    .table-title {
-      font-family: var(--mono);
+    .stat-item {
+      padding: 6px 20px 6px 0;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+
+    .stat-item::before {
+      content: '│';
+      color: var(--border);
+      margin-right: 8px;
+    }
+
+    .stat-item:first-child::before { content: ''; margin: 0; }
+
+    .stat-key   { color: var(--text2); font-size: 11px; }
+    .stat-val   { color: var(--text);  font-weight: 700; font-size: 15px; }
+    .stat-val.v-green { color: var(--green); }
+    .stat-val.v-yellow { color: var(--yellow); }
+    .stat-val.flash { animation: numFlash 0.4s ease; }
+
+    /* ── SSE status ── */
+    .sse-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 11px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
+      margin-bottom: 16px;
+      padding: 4px 0;
     }
 
-    .last-update {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      opacity: 0.6;
+    .sse-indicator {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: blink 1.4s step-end infinite;
+      flex-shrink: 0;
     }
 
-    /* Scrollable table wrapper */
+    .sse-status.disconnected .sse-indicator { background: var(--red); animation: none; }
+    .sse-status.reconnecting .sse-indicator { background: var(--yellow); animation: blink 0.6s step-end infinite; }
+
+    .sse-text { color: var(--text2); }
+    .sse-status.connected   .sse-text { color: var(--green); }
+    .sse-status.disconnected .sse-text { color: var(--red); }
+    .sse-status.reconnecting .sse-text { color: var(--yellow); }
+
+    .last-update-text {
+      color: var(--text3);
+      font-size: 11px;
+      margin-left: 16px;
+    }
+
+    /* ── Table ── */
     .table-wrap {
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      overflow: hidden;
       overflow-x: auto;
-      min-height: 200px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-family: var(--mono);
-      font-size: 13px;
+      font-size: 12px;
+    }
+
+    thead tr {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
     }
 
     thead th {
-      padding: 12px 20px;
+      padding: 8px 16px;
       text-align: left;
       font-size: 10px;
-      letter-spacing: 0.12em;
+      font-weight: 500;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--muted);
-      background: var(--surface2);
-      border-bottom: 1px solid var(--border);
+      color: var(--text3);
       white-space: nowrap;
-      user-select: none;
     }
 
-    thead th:first-child { width: 40px; color: transparent; }
+    thead th:first-child {
+      color: var(--text3);
+      width: 36px;
+      text-align: center;
+    }
 
     tbody tr {
-      border-bottom: 1px solid rgba(42,42,56,0.6);
-      transition: background 0.15s;
+      border-bottom: 1px solid var(--border2);
+      transition: background 0.1s;
     }
 
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
 
-    /* Row enter animation */
-    tbody tr.row-enter {
-      animation: rowIn 0.35s ease both;
-    }
-
-    tbody tr.row-exit {
-      animation: rowOut 0.3s ease forwards;
-    }
-
-    tbody tr.row-flash {
-      animation: rowFlash 0.5s ease;
+    tbody tr:hover {
+      background: var(--bg2);
     }
 
     td {
-      padding: 14px 20px;
-      vertical-align: middle;
+      padding: 9px 16px;
       color: var(--text);
+      vertical-align: middle;
     }
 
-    /* Row index */
-    td.row-index {
-      color: var(--muted);
+    td.col-idx {
+      color: var(--text3);
+      text-align: center;
       font-size: 11px;
-      opacity: 0.5;
-      width: 40px;
+      width: 36px;
     }
 
-    /* Status badge */
-    .status-badge {
+    td.col-domain { color: var(--blue); }
+
+    td.col-client {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    td.col-temp {
+      color: var(--purple);
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      max-width: 180px;
+    }
+
+    td.col-temp .key-val {
+      display: inline-block;
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    td.col-temp:hover .key-val {
+      color: var(--cyan);
+    }
+
+    td.col-temp .copy-hint {
+      font-size: 10px;
+      color: var(--text3);
+      margin-left: 6px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      vertical-align: middle;
+    }
+
+    td.col-temp:hover .copy-hint { opacity: 1; }
+
+    td.col-temp.copied .key-val  { color: var(--green); }
+    td.col-temp.copied .copy-hint {
+      opacity: 1;
+      color: var(--green);
+    }
+
+    /* ── Status badge ── */
+    .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 3px 10px;
-      border-radius: 100px;
-      font-size: 11px;
+      gap: 5px;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      white-space: nowrap;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid currentColor;
     }
 
-    .status-badge::before {
+    .badge::before {
       content: '';
       width: 5px; height: 5px;
       border-radius: 50%;
       background: currentColor;
     }
 
-    .status-active  { color: var(--success); background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.25); }
-    .status-idle    { color: var(--warning); background: rgba(251,191,36,0.1);  border: 1px solid rgba(251,191,36,0.25); }
-    .status-dead    { color: var(--danger);  background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); }
-    .status-unknown { color: var(--muted);   background: rgba(112,112,160,0.1); border: 1px solid rgba(112,112,160,0.25); }
+    .badge-active  { color: var(--green);  background: rgba(63,185,80,0.08); }
+    .badge-idle    { color: var(--yellow); background: rgba(210,153,34,0.08); }
+    .badge-dead    { color: var(--red);    background: rgba(248,81,73,0.08); }
+    .badge-unknown { color: var(--text2);  background: rgba(139,148,158,0.08); }
 
-    /* Empty state */
+    /* ── Row animations ── */
+    tbody tr.row-enter { animation: rowIn 0.3s ease both; }
+    tbody tr.row-exit  { animation: rowOut 0.25s ease forwards; }
+
+    /* ── Empty state ── */
     .empty-state {
-      padding: 60px 20px;
-      text-align: center;
-      font-family: var(--mono);
-      font-size: 12px;
-      color: var(--muted);
-      opacity: 0.5;
       display: none;
+      padding: 40px 16px;
+      text-align: left;
     }
 
-    .empty-state svg {
-      width: 36px; height: 36px;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 1.5;
-      margin-bottom: 12px;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
+    .empty-state .empty-prompt {
+      color: var(--text3);
+      font-size: 12px;
+    }
+
+    .empty-state .empty-prompt span { color: var(--green); }
+
+    /* ── Cursor blink ── */
+    .cursor {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--green);
+      margin-left: 2px;
+      vertical-align: middle;
+      animation: cursorBlink 1s step-end infinite;
     }
 
     /* ── Animations ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
     }
 
-    @keyframes pulse {
+    @keyframes cursorBlink {
       0%, 100% { opacity: 1; }
-      50%       { opacity: 0.3; }
+      50%       { opacity: 0; }
+    }
+
+    @keyframes numFlash {
+      0%   { color: var(--green); }
+      100% { color: inherit; }
     }
 
     @keyframes rowIn {
-      from { opacity: 0; transform: translateX(-8px); background: rgba(123,110,246,0.08); }
-      to   { opacity: 1; transform: translateX(0);    background: transparent; }
+      from { opacity: 0; background: rgba(63,185,80,0.05); transform: translateX(-4px); }
+      to   { opacity: 1; background: transparent;          transform: translateX(0); }
     }
 
     @keyframes rowOut {
-      from { opacity: 1; transform: translateX(0);    background: transparent; }
-      to   { opacity: 0; transform: translateX(8px);  background: rgba(248,113,113,0.06); }
+      from { opacity: 1; background: transparent;           }
+      to   { opacity: 0; background: rgba(248,81,73,0.05); }
     }
 
-    @keyframes rowFlash {
-      0%   { background: rgba(123,110,246,0.12); }
-      100% { background: transparent; }
-    }
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
   </style>
 </head>
 <body>
-<div class="page">
+<div class="terminal">
 
-  <!-- Nav -->
-  <nav>
-    <a href="/" class="nav-brand">BeEF HUB</a>
-    <div class="nav-links">
-      <a href="/"         class="nav-link">Encoder</a>
-      <a href="/sessions" class="nav-link active">Sessions</a>
+  <!-- Window chrome -->
+  <div class="win-bar">
+    <div class="win-dots">
+      <div class="win-dot close"></div>
+      <div class="win-dot min"></div>
+      <div class="win-dot max"></div>
     </div>
-  </nav>
-
-  <!-- Header -->
-  <div class="header">
-    <div class="tag">Live Feed</div>
-    <h1>Active Sessions</h1>
-    <p class="subtitle">// realtime session monitor — updates instantly on change</p>
-  </div>
-
-  <!-- Stats bar -->
-  <div class="stats-bar">
-    <div class="stat">
-      <div>
-        <div class="stat-value" id="statTotal">0</div>
-        <div class="stat-label">Total</div>
-      </div>
-    </div>
-    <div class="stat">
-      <div>
-        <div class="stat-value" id="statActive">0</div>
-        <div class="stat-label">Active</div>
-      </div>
-    </div>
-    <div class="stat">
-      <div>
-        <div class="stat-value" id="statIdle">0</div>
-        <div class="stat-label">Idle</div>
-      </div>
-    </div>
-
-    <div class="sse-pill" id="ssePill">
-      <span class="sse-dot"></span>
-      <span id="sseLabel">connecting…</span>
+    <div class="win-title">beef-hub — sessions — bash</div>
+    <div class="win-nav">
+      <a href="/">encoder</a>
+      <a href="/sessions" class="active">sessions</a>
     </div>
   </div>
 
-  <!-- Table -->
-  <div class="table-card">
-    <div class="table-toolbar">
-      <span class="table-title">session log</span>
-      <span class="last-update" id="lastUpdate">—</span>
+  <!-- Terminal body -->
+  <div class="term-body">
+
+    <!-- Boot lines -->
+    <div class="prompt-line" style="color: var(--text3); font-size: 11px; margin-bottom: 12px;">
+      BeEF HUB v1.0.0 &nbsp;·&nbsp; Node.js runtime &nbsp;·&nbsp; SSE enabled
     </div>
 
-    <div class="table-wrap">
-      <table id="sessionTable">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Domain</th>
-            <th>Client</th>
-            <th>Temp</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-      <div class="empty-state" id="emptyState">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        No sessions found
+    <!-- Command line -->
+    <div class="prompt-line">
+      <span class="prompt-user">root</span>
+      <span class="prompt-at">@</span>
+      <span class="prompt-host">beef-hub</span>
+      <span class="prompt-sep">:</span>
+      <span class="prompt-path">~/sessions</span>
+      <span class="prompt-sym">$</span>
+      <span class="prompt-cmd">watch</span>
+      <span class="prompt-arg">--interval=0</span>
+      <span class="prompt-arg">sessions.json</span>
+    </div>
+
+    <!-- Output block -->
+    <div class="output-block">
+
+      <!-- SSE status -->
+      <div class="sse-status reconnecting" id="ssePill">
+        <div class="sse-indicator"></div>
+        <span class="sse-text" id="sseLabel">connecting to stream…</span>
+        <span class="last-update-text" id="lastUpdate"></span>
       </div>
-    </div>
-  </div>
 
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-item">
+          <span class="stat-key">total</span>
+          <span class="stat-val" id="statTotal">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-key">active</span>
+          <span class="stat-val v-green" id="statActive">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-key">idle</span>
+          <span class="stat-val v-yellow" id="statIdle">0</span>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table id="sessionTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Domain</th>
+              <th>Client</th>
+              <th>Temp / Key</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-prompt">
+            <span>$</span> tail -f sessions.json<br>
+            <span style="color: var(--text3)">— no active sessions —</span>
+            <span class="cursor"></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Live prompt at bottom -->
+    <div class="prompt-line" style="margin-top: 8px;">
+      <span class="prompt-user">root</span>
+      <span class="prompt-at">@</span>
+      <span class="prompt-host">beef-hub</span>
+      <span class="prompt-sep">:</span>
+      <span class="prompt-path">~/sessions</span>
+      <span class="prompt-sym">$</span>
+      <span class="cursor"></span>
+    </div>
+
+  </div>
 </div>
 
 <script>
@@ -509,41 +525,37 @@
 
   /* ── SSE connection ───────────────────────────────────────────── */
   function connect() {
-    setPill("reconnecting", "connecting…");
+    setPill("reconnecting", "connecting to stream…");
 
     eventSource = new EventSource("/api/sessions/stream");
 
     eventSource.addEventListener("sessions", (e) => {
       const incoming = JSON.parse(e.data);
       handleUpdate(incoming);
-      setPill("connected", "live");
+      setPill("connected", "stream live");
     });
 
     eventSource.addEventListener("open", () => {
-      setPill("connected", "live");
+      setPill("connected", "stream live");
     });
 
     eventSource.onerror = () => {
-      setPill("disconnected", "disconnected");
+      setPill("disconnected", "stream disconnected");
       eventSource.close();
-      // Reconnect after 3s
       setTimeout(connect, 3000);
     };
   }
 
   /* ── Diffed render ────────────────────────────────────────────── */
   function handleUpdate(incoming) {
-    // Derive column keys from first object if not yet known
     if (incoming.length > 0 && columnKeys.length === 0) {
       columnKeys = Object.keys(incoming[0]);
-      renderHeaders(columnKeys);
     }
 
-    const tbody = document.getElementById("tableBody");
+    const tbody  = document.getElementById("tableBody");
     const oldIds = sessions.map(s => JSON.stringify(s));
     const newIds = incoming.map(s => JSON.stringify(s));
 
-    // Find removed rows — animate out then remove
     const removedIndices = [];
     sessions.forEach((s, i) => {
       if (!newIds.includes(JSON.stringify(s))) removedIndices.push(i);
@@ -557,24 +569,16 @@
       }
     });
 
-    // Rebuild after removals settle
     setTimeout(() => {
       sessions = incoming;
       renderRows(sessions, oldIds);
       updateStats(sessions);
       updateTimestamp();
-    }, removedIndices.length > 0 ? 320 : 0);
-  }
-
-  function renderHeaders(keys) {
-    const thead = document.querySelector("#sessionTable thead tr");
-    thead.innerHTML = "<th>#</th>" + keys.map(k =>
-      `<th>${escHtml(k)}</th>`
-    ).join("");
+    }, removedIndices.length > 0 ? 270 : 0);
   }
 
   function renderRows(data, oldIds) {
-    const tbody = document.getElementById("tableBody");
+    const tbody      = document.getElementById("tableBody");
     const emptyState = document.getElementById("emptyState");
 
     if (data.length === 0) {
@@ -585,26 +589,21 @@
 
     emptyState.style.display = "none";
 
-    // Build a map of existing rows by serialized key
     const existingRows = {};
-    Array.from(tbody.rows).forEach(row => {
-      existingRows[row.dataset.key] = row;
-    });
+    Array.from(tbody.rows).forEach(row => { existingRows[row.dataset.key] = row; });
 
     const fragment = document.createDocumentFragment();
 
     data.forEach((session, idx) => {
-      const key = JSON.stringify(session);
+      const key   = JSON.stringify(session);
       const isNew = !oldIds.includes(key);
-
-      let row = existingRows[key];
+      let row     = existingRows[key];
 
       if (!row) {
         row = document.createElement("tr");
         row.dataset.key = key;
         if (isNew) row.classList.add("row-enter");
       } else {
-        // Row exists — check if it changed position (flash)
         delete existingRows[key];
         row.classList.remove("row-enter", "row-exit");
       }
@@ -618,32 +617,63 @@
   }
 
   function buildRowHTML(session, idx) {
-    const keys = columnKeys.length > 0 ? columnKeys : Object.keys(session);
-    const cells = keys.map(k => {
-      const val = session[k] ?? "—";
-      if (k.toLowerCase() === "status" || k === "Status") {
-        return `<td>${statusBadge(String(val))}</td>`;
+    const keys  = columnKeys.length > 0 ? columnKeys : Object.keys(session);
+    let cells   = `<td class="col-idx">${idx + 1}</td>`;
+
+    keys.forEach(k => {
+      const val     = session[k] ?? "—";
+      const kLower  = k.toLowerCase();
+
+      if (kLower === "status") {
+        cells += `<td>${statusBadge(String(val))}</td>`;
+      } else if (kLower === "temp" || kLower === "key") {
+        cells += `<td class="col-temp" onclick="copyKey(this, ${JSON.stringify(String(val))})">
+          <span class="key-val">${escHtml(String(val))}</span>
+          <span class="copy-hint">[copy]</span>
+        </td>`;
+      } else if (kLower === "domain" || kLower === "from") {
+        cells += `<td class="col-domain">${escHtml(String(val))}</td>`;
+      } else if (kLower === "client") {
+        cells += `<td class="col-client">${escHtml(String(val))}</td>`;
+      } else {
+        cells += `<td>${escHtml(String(val))}</td>`;
       }
-      return `<td>${escHtml(String(val))}</td>`;
-    }).join("");
-    return `<td class="row-index">${idx + 1}</td>${cells}`;
+    });
+
+    return cells;
   }
 
   function statusBadge(val) {
-    const map = {
-      active: "status-active",
-      idle:   "status-idle",
-      dead:   "status-dead"
-    };
-    const cls = map[val.toLowerCase()] || "status-unknown";
-    return `<span class="status-badge ${cls}">${escHtml(val)}</span>`;
+    const map = { active: "badge-active", idle: "badge-idle", dead: "badge-dead" };
+    const cls = map[val.toLowerCase()] || "badge-unknown";
+    return `<span class="badge ${cls}">${escHtml(val)}</span>`;
+  }
+
+  /* ── Copy key on click ────────────────────────────────────────── */
+  function copyKey(cell, val) {
+    navigator.clipboard.writeText(val).then(() => {
+      cell.classList.add("copied");
+      cell.querySelector(".copy-hint").textContent = "[copied!]";
+      setTimeout(() => {
+        cell.classList.remove("copied");
+        cell.querySelector(".copy-hint").textContent = "[copy]";
+      }, 2000);
+    }).catch(() => {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = val;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    });
   }
 
   /* ── Stats ────────────────────────────────────────────────────── */
   function updateStats(data) {
     setStatVal("statTotal",  data.length);
-    setStatVal("statActive", data.filter(s => String(s.status || "").toLowerCase() === "active").length);
-    setStatVal("statIdle",   data.filter(s => String(s.status || "").toLowerCase() === "idle").length);
+    setStatVal("statActive", data.filter(s => String(s.Status || s.status || "").toLowerCase() === "active").length);
+    setStatVal("statIdle",   data.filter(s => String(s.Status || s.status || "").toLowerCase() === "idle").length);
   }
 
   function setStatVal(id, val) {
@@ -651,23 +681,23 @@
     if (el.textContent !== String(val)) {
       el.textContent = val;
       el.classList.add("flash");
-      setTimeout(() => el.classList.remove("flash"), 600);
+      setTimeout(() => el.classList.remove("flash"), 400);
     }
   }
 
   /* ── SSE pill ─────────────────────────────────────────────────── */
   function setPill(state, label) {
-    const pill  = document.getElementById("ssePill");
-    const lbl   = document.getElementById("sseLabel");
-    pill.className = "sse-pill " + (state === "connected" ? "" : state);
+    const pill = document.getElementById("ssePill");
+    const lbl  = document.getElementById("sseLabel");
+    pill.className = "sse-status " + state;
     lbl.textContent = label;
   }
 
   /* ── Timestamp ────────────────────────────────────────────────── */
   function updateTimestamp() {
-    const el = document.getElementById("lastUpdate");
+    const el  = document.getElementById("lastUpdate");
     const now = new Date();
-    el.textContent = "last update: " + now.toLocaleTimeString();
+    el.textContent = "· updated " + now.toLocaleTimeString();
   }
 
   /* ── Helpers ──────────────────────────────────────────────────── */

