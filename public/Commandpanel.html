@@ -184,7 +184,7 @@
   <div class="tb-title"><span>CENTRAL CYBER COMMAND PANEL</span> &nbsp;·&nbsp; v2.0.0</div>
   <div class="tb-nav">
     <a href="/commandpanel" class="active">Command Panel</a>
-    <a href="/WorldMap.html">World Map</a>
+    <a href="/worldmap">World Map</a>
   </div>
 </div>
 
@@ -479,7 +479,7 @@
     else if (action === 'unwatch') execUnwatch(ip);
     else if (action === 'copyip')  navigator.clipboard.writeText(ip).then(() => printOutput('ok', `copied: ${ip}`));
     else if (action === 'copykey') navigator.clipboard.writeText(String(session.KEY || session.key || '')).then(() => printOutput('ok', 'key copied'));
-    else if (action === 'map') window.location.href = '/WorldMap.html?highlight=' + encodeURIComponent(ip);
+    else if (action === 'map') window.location.href = '/worldmap?highlight=' + encodeURIComponent(ip);
     hideCtx();
   }
 
