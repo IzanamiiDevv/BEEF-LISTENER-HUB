@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCCP — World Map</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #07070f;
+      --bg2:     #0d0d1a;
+      --bg3:     #121220;
+      --bg4:     #181830;
+      --border:  #1e1e3a;
+      --border2: #2a2a50;
+      --purple:  #7c3aed;
+      --purple3: #c084fc;
+      --blue3:   #93c5fd;
+      --cyan2:   #22d3ee;
+      --green:   #10b981;
+      --green2:  #34d399;
+      --yellow:  #f59e0b;
+      --yellow2: #fbbf24;
+      --red2:    #f87171;
+      --text:    #e2e8f0;
+      --text2:   #94a3b8;
+      --text3:   #475569;
+      --mono:    'Fira Code', monospace;
+    }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; display: flex; flex-direction: column; }
+    .scanline { position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 4px); pointer-events: none; z-index: 9999; }
+
+    /* Titlebar */
+    .titlebar { display: flex; align-items: center; gap: 12px; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 9px 16px; flex-shrink: 0; z-index: 10; }
+    .tb-dots { display: flex; gap: 6px; }
+    .tb-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .tb-dot.r { background: #ff5f57; } .tb-dot.y { background: #febc2e; } .tb-dot.g { background: #28c840; }
+    .tb-title { flex: 1; text-align: center; font-size: 11px; color: var(--text3); letter-spacing: 0.15em; text-transform: uppercase; }
+    .tb-title span { color: var(--purple3); }
+    .tb-nav { display: flex; gap: 3px; }
+    .tb-nav a { background: transparent; border: 1px solid transparent; color: var(--text2); font-family: var(--mono); font-size: 11px; padding: 3px 12px; border-radius: 4px; cursor: pointer; letter-spacing: 0.05em; transition: all 0.15s; text-decoration: none; }
+    .tb-nav a:hover { color: var(--text); border-color: var(--border2); background: var(--bg3); }
+    .tb-nav a.active { color: var(--purple3); border-color: var(--purple); background: rgba(124,58,237,0.12); }
+
+    /* Map container */
+    .map-wrap { flex: 1; position: relative; overflow: hidden; }
+    #map { width: 100%; height: 100%; background: #04040a; }
+
+    /* Dark terminal tile filter */
+    .leaflet-tile { filter: invert(1) hue-rotate(200deg) brightness(0.75) saturate(0.35) contrast(0.9) !important; }
+    .leaflet-container { background: #04040a !important; }
+    .leaflet-control-zoom { border: 1px solid var(--border2) !important; border-radius: 4px !important; overflow: hidden; }
+    .leaflet-control-zoom a { background: var(--bg2) !important; color: var(--purple3) !important; border-color: var(--border) !important; font-family: var(--mono) !important; line-height: 26px !important; width: 26px !important; height: 26px !important; font-size: 14px !important; }
+    .leaflet-control-zoom a:hover { background: var(--bg3) !important; color: var(--purple3) !important; }
+    .leaflet-control-attribution { background: rgba(7,7,15,0.7) !important; color: var(--text3) !important; font-family: var(--mono) !important; font-size: 9px !important; border: none !important; }
+    .leaflet-control-attribution a { color: var(--text3) !important; }
+
+    /* Overlay panels */
+    .overlay-tl {
+      position: absolute; top: 14px; left: 14px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .overlay-tr {
+      position: absolute; top: 14px; right: 14px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none; align-items: flex-end;
+    }
+    .overlay-bl {
+      position: absolute; bottom: 14px; left: 14px; z-index: 1000;
+      pointer-events: none;
+    }
+
+    .panel {
+      background: rgba(7,7,15,0.92);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      pointer-events: all;
+      backdrop-filter: blur(4px);
+    }
+
+    .panel-hdr {
+      padding: 6px 12px;
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text3);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .panel-hdr::before { content: '◆'; color: var(--purple3); font-size: 7px; }
+
+    /* Stats panel */
+    .stats-panel { min-width: 200px; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; padding: 10px 12px; gap: 8px 0; }
+    .stat-cell { display: flex; flex-direction: column; gap: 1px; }
+    .stat-cell:nth-child(odd) { border-right: 1px solid var(--border); padding-right: 12px; }
+    .stat-cell:nth-child(even) { padding-left: 12px; }
+    .stat-v { font-size: 20px; font-weight: 700; line-height: 1; }
+    .stat-k { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text3); margin-top: 2px; }
+    .v-purple { color: var(--purple3); } .v-green { color: var(--green2); }
+    .v-yellow { color: var(--yellow2); } .v-cyan { color: var(--cyan2); }
+
+    /* Legend panel */
+    .legend-panel { min-width: 160px; }
+    .legend-body { padding: 9px 12px; display: flex; flex-direction: column; gap: 7px; }
+    .legend-row { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--text2); }
+    .legend-icon { width: 22px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .leg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid; }
+    .leg-dot.active { background: rgba(52,211,153,0.4); border-color: var(--green2); }
+    .leg-dot.idle { background: rgba(251,191,36,0.4); border-color: var(--yellow2); }
+    .leg-circle { width: 16px; height: 16px; border-radius: 50%; border: 1px dashed; opacity: 0.6; }
+    .leg-circle.active { border-color: var(--green2); }
+    .leg-circle.idle { border-color: var(--yellow2); }
+
+    /* SSE pill */
+    .sse-pill { display: flex; align-items: center; gap: 6px; font-size: 10px; padding: 4px 10px; border-radius: 3px; border: 1px solid; }
+    .sse-pill.connected { color: var(--green2); border-color: rgba(52,211,153,0.3); background: rgba(7,7,15,0.9); }
+    .sse-pill.disconnected { color: var(--red2); border-color: rgba(248,113,113,0.3); background: rgba(7,7,15,0.9); }
+    .sse-pill.reconnecting { color: var(--yellow); border-color: rgba(245,158,11,0.3); background: rgba(7,7,15,0.9); }
+    .sse-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .sse-pill.connected .sse-dot { animation: pulse 1.4s step-end infinite; }
+    .sse-pill.reconnecting .sse-dot { animation: pulse 0.6s step-end infinite; }
+
+    /* Session list panel */
+    .session-list-panel { width: 230px; max-height: 340px; display: flex; flex-direction: column; }
+    .session-list-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .session-list-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 12px; cursor: pointer;
+      transition: background 0.1s; border-bottom: 1px solid var(--border);
+      font-size: 11px;
+    }
+    .session-list-item:last-child { border-bottom: none; }
+    .session-list-item:hover { background: rgba(124,58,237,0.1); }
+    .session-list-item.highlighted { background: rgba(124,58,237,0.15); }
+    .sl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .sl-dot.active { background: var(--green2); animation: pulse 1.8s infinite; }
+    .sl-dot.idle { background: var(--yellow2); }
+    .sl-dot.dead { background: var(--red2); }
+    .sl-dot.unknown { background: var(--text3); }
+    .sl-ip { color: var(--text); font-variant-numeric: tabular-nums; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sl-status { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .sl-status.active { color: var(--green2); }
+    .sl-status.idle { color: var(--yellow2); }
+    .sl-status.dead { color: var(--red2); }
+    .sl-status.unknown { color: var(--text3); }
+    .sl-empty { padding: 12px; font-size: 11px; color: var(--text3); text-align: center; }
+
+    /* Last update */
+    .last-update { font-size: 10px; color: var(--text3); padding: 6px 12px; border-top: 1px solid var(--border); }
+
+    /* Leaflet custom popup */
+    .leaflet-popup-content-wrapper {
+      background: var(--bg3) !important;
+      border: 1px solid var(--border2) !important;
+      border-radius: 5px !important;
+      box-shadow: 0 6px 30px rgba(0,0,0,0.7) !important;
+      padding: 0 !important;
+    }
+    .leaflet-popup-content { margin: 0 !important; font-family: var(--mono) !important; }
+    .leaflet-popup-tip-container { display: none !important; }
+    .leaflet-popup-close-button { color: var(--text3) !important; font-size: 16px !important; top: 6px !important; right: 8px !important; }
+    .leaflet-popup-close-button:hover { color: var(--purple3) !important; }
+
+    .popup-box { padding: 12px 14px; min-width: 200px; }
+    .popup-ip { font-size: 13px; font-weight: 600; color: var(--purple3); margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+    .popup-ip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .popup-ip-dot.active { background: var(--green2); box-shadow: 0 0 6px var(--green2); }
+    .popup-ip-dot.idle { background: var(--yellow2); box-shadow: 0 0 6px var(--yellow2); }
+    .popup-ip-dot.dead { background: var(--red2); }
+    .popup-ip-dot.unknown { background: var(--text3); }
+    .popup-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 3px 0; border-bottom: 1px solid var(--border); }
+    .popup-row:last-child { border-bottom: none; }
+    .popup-k { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); padding-top: 2px; flex-shrink: 0; }
+    .popup-v { font-size: 11px; color: var(--text2); text-align: right; max-width: 140px; word-break: break-all; }
+    .popup-v.green { color: var(--green2); } .popup-v.yellow { color: var(--yellow2); } .popup-v.red { color: var(--red2); }
+    .popup-geo { font-size: 10px; color: var(--text3); margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+    /* Custom marker */
+    .cccp-pin { position: relative; display: flex; align-items: center; justify-content: center; }
+    .pin-core { border-radius: 50%; border: 2px solid; transition: transform 0.2s; }
+    .pin-core:hover { transform: scale(1.3); }
+    .pin-core.active { background: rgba(52,211,153,0.35); border-color: var(--green2); box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+    .pin-core.idle { background: rgba(251,191,36,0.35); border-color: var(--yellow2); box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+    .pin-core.dead { background: rgba(248,113,113,0.35); border-color: var(--red2); }
+    .pin-core.unknown { background: rgba(148,163,184,0.2); border-color: var(--text3); }
+    .pin-core.highlighted { box-shadow: 0 0 0 3px rgba(124,58,237,0.5), 0 0 12px var(--purple); }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+  </style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<div class="titlebar">
+  <div class="tb-dots"><div class="tb-dot r"></div><div class="tb-dot y"></div><div class="tb-dot g"></div></div>
+  <div class="tb-title"><span>CENTRAL CYBER COMMAND PANEL</span> &nbsp;·&nbsp; WORLD MAP</div>
+  <div class="tb-nav">
+    <a href="/CommandPanel.html">Command Panel</a>
+    <a href="/WorldMap.html" class="active">World Map</a>
+  </div>
+</div>
+
+<div class="map-wrap">
+  <div id="map"></div>
+
+  <!-- Top-left: stats + SSE -->
+  <div class="overlay-tl">
+    <div class="panel stats-panel">
+      <div class="panel-hdr">session intel</div>
+      <div class="stats-grid">
+        <div class="stat-cell"><span class="stat-v v-purple" id="statTotal">0</span><span class="stat-k">total</span></div>
+        <div class="stat-cell"><span class="stat-v v-green" id="statActive">0</span><span class="stat-k">active</span></div>
+        <div class="stat-cell"><span class="stat-v v-yellow" id="statIdle">0</span><span class="stat-k">idle</span></div>
+        <div class="stat-cell"><span class="stat-v v-cyan" id="statGeo">0</span><span class="stat-k">located</span></div>
+      </div>
+    </div>
+    <div class="sse-pill reconnecting" id="ssePill" style="pointer-events:all;">
+      <div class="sse-dot"></div>
+      <span id="sseLabel">connecting to stream…</span>
+    </div>
+  </div>
+
+  <!-- Top-right: legend + session list -->
+  <div class="overlay-tr">
+    <div class="panel legend-panel">
+      <div class="panel-hdr">legend</div>
+      <div class="legend-body">
+        <div class="legend-row"><div class="legend-icon"><div class="leg-dot active"></div></div>active session</div>
+        <div class="legend-row"><div class="legend-icon"><div class="leg-dot idle"></div></div>idle session</div>
+        <div class="legend-row"><div class="legend-icon"><div class="leg-circle active"></div></div>location radius (active)</div>
+        <div class="legend-row"><div class="legend-icon"><div class="leg-circle idle"></div></div>location radius (idle)</div>
+        <div class="legend-row" style="color:var(--text3);font-size:10px;padding-top:4px;border-top:1px solid var(--border);margin-top:2px;">IP geolocation is approximate.<br>Circle = uncertainty radius.</div>
+      </div>
+    </div>
+
+    <div class="panel session-list-panel">
+      <div class="panel-hdr">live sessions</div>
+      <div class="session-list-body" id="sessionList">
+        <div class="sl-empty">// no sessions</div>
+      </div>
+      <div class="last-update" id="lastUpdate">// waiting for stream…</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    center: [20, 10],
+    zoom: 2,
+    minZoom: 2,
+    maxZoom: 12,
+    zoomSnap: 0.5,
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  const highlightIP = new URLSearchParams(window.location.search).get('highlight') || null;
+
+  let sessions = [];
+  let geoCache = {};
+  let markers = {};
+  let circles = {};
+  let eventSource = null;
+  let geoQueue = [];
+  let geoProcessing = false;
+
+  function connect() {
+    setPill('reconnecting', 'connecting to stream…');
+    eventSource = new EventSource('/api/sessions/stream');
+    eventSource.addEventListener('sessions', e => {
+      handleUpdate(JSON.parse(e.data));
+      setPill('connected', 'stream live');
+    });
+    eventSource.addEventListener('open', () => setPill('connected', 'stream live'));
+    eventSource.onerror = () => {
+      setPill('disconnected', 'stream disconnected — retrying…');
+      eventSource.close();
+      setTimeout(connect, 3000);
+    };
+  }
+
+  function handleUpdate(incoming) {
+    sessions = incoming;
+    updateStats(sessions);
+    updateSessionList(sessions);
+    document.getElementById('lastUpdate').textContent = '// updated ' + new Date().toLocaleTimeString();
+    syncMarkers(sessions);
+  }
+
+  function updateStats(data) {
+    document.getElementById('statTotal').textContent  = data.length;
+    document.getElementById('statActive').textContent = data.filter(s => status(s) === 'active').length;
+    document.getElementById('statIdle').textContent   = data.filter(s => status(s) === 'idle').length;
+    document.getElementById('statGeo').textContent    = Object.keys(geoCache).length;
+  }
+
+  function updateSessionList(data) {
+    const list = document.getElementById('sessionList');
+    if (data.length === 0) { list.innerHTML = '<div class="sl-empty">// no active sessions</div>'; return; }
+    list.innerHTML = '';
+    data.forEach(s => {
+      const ip = s.Client || s.client || '?';
+      const st = status(s);
+      const div = document.createElement('div');
+      div.className = 'session-list-item' + (ip === highlightIP ? ' highlighted' : '');
+      div.dataset.ip = ip;
+      div.innerHTML = `
+        <span class="sl-dot ${st}"></span>
+        <span class="sl-ip">${esc(ip)}</span>
+        <span class="sl-status ${st}">${st}</span>`;
+      div.onclick = () => focusIP(ip);
+      list.appendChild(div);
+    });
+  }
+
+  function syncMarkers(data) {
+    const activeIPs = new Set(data.map(s => s.Client || s.client || ''));
+
+    Object.keys(markers).forEach(ip => {
+      if (!activeIPs.has(ip)) {
+        map.removeLayer(markers[ip]);
+        map.removeLayer(circles[ip]);
+        delete markers[ip];
+        delete circles[ip];
+      }
+    });
+
+    data.forEach(s => {
+      const ip = s.Client || s.client || '';
+      if (!ip) return;
+      if (geoCache[ip]) {
+        placeMarker(ip, s, geoCache[ip]);
+      } else if (!geoQueue.includes(ip)) {
+        geoQueue.push(ip);
+        processGeoQueue();
+      }
+    });
+  }
+
+  async function processGeoQueue() {
+    if (geoProcessing || geoQueue.length === 0) return;
+    geoProcessing = true;
+    while (geoQueue.length > 0) {
+      const ip = geoQueue.shift();
+      const geo = await geolocate(ip);
+      geoCache[ip] = geo;
+      const session = sessions.find(s => (s.Client || s.client) === ip);
+      if (session) placeMarker(ip, session, geo);
+      document.getElementById('statGeo').textContent = Object.keys(geoCache).length;
+      await sleep(300);
+    }
+    geoProcessing = false;
+  }
+
+  function placeMarker(ip, session, geo) {
+    const st = status(session);
+    const isHighlight = ip === highlightIP;
+    const isActive = st === 'active';
+    const circleColor = isActive ? '#34d399' : '#fbbf24';
+    const markerSize = 14;
+    const radiusMeters = 80000;
+
+    if (circles[ip]) map.removeLayer(circles[ip]);
+    circles[ip] = L.circle([geo.lat, geo.lng], {
+      radius: radiusMeters,
+      color: circleColor,
+      fillColor: circleColor,
+      fillOpacity: 0.06,
+      weight: 1,
+      dashArray: '4 4',
+      opacity: 0.45,
+    }).addTo(map);
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="cccp-pin"><div class="pin-core ${st}${isHighlight ? ' highlighted' : ''}" style="width:${markerSize}px;height:${markerSize}px;"></div></div>`,
+      iconSize: [markerSize, markerSize],
+      iconAnchor: [markerSize / 2, markerSize / 2],
+      popupAnchor: [0, -(markerSize / 2 + 6)],
+    });
+
+    const from    = esc(session.FROM || session.from || '—');
+    const keyRaw  = String(session.KEY || session.key || '—');
+    const keyDisp = keyRaw.length > 22 ? keyRaw.slice(0, 22) + '…' : keyRaw;
+    const ls      = session.lastSeen ? relativeTime(session.lastSeen) : '—';
+    const stColor = { active: 'green', idle: 'yellow', dead: 'red' }[st] || '';
+
+    const popupHtml = `
+      <div class="popup-box">
+        <div class="popup-ip">
+          <span class="popup-ip-dot ${st}"></span>
+          ${esc(ip)}
+        </div>
+        <div class="popup-row"><span class="popup-k">from</span><span class="popup-v">${from}</span></div>
+        <div class="popup-row"><span class="popup-k">key</span><span class="popup-v">${esc(keyDisp)}</span></div>
+        <div class="popup-row"><span class="popup-k">status</span><span class="popup-v ${stColor}">${st}</span></div>
+        <div class="popup-row"><span class="popup-k">last seen</span><span class="popup-v">${ls}</span></div>
+        <div class="popup-geo">
+          📍 ${esc(geo.city)}, ${esc(geo.country)}<br>
+          <span style="color:var(--text3)">${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)} · ~80km radius</span>
+        </div>
+      </div>`;
+
+    if (markers[ip]) {
+      markers[ip].setIcon(icon);
+      markers[ip].setLatLng([geo.lat, geo.lng]);
+      markers[ip].setPopupContent(popupHtml);
+    } else {
+      markers[ip] = L.marker([geo.lat, geo.lng], { icon })
+        .bindPopup(popupHtml, { maxWidth: 260, minWidth: 200 })
+        .addTo(map);
+      if (ip === highlightIP) {
+        setTimeout(() => { markers[ip].openPopup(); map.setView([geo.lat, geo.lng], 6, { animate: true }); }, 600);
+      }
+    }
+  }
+
+  function focusIP(ip) {
+    if (markers[ip]) {
+      const latlng = markers[ip].getLatLng();
+      map.flyTo(latlng, 6, { animate: true, duration: 1.2 });
+      setTimeout(() => markers[ip].openPopup(), 1300);
+    }
+  }
+
+  async function geolocate(ip) {
+    const isLocal = ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('192.168.') || ip.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+    if (isLocal) {
+      const j = () => (Math.random() - 0.5) * 0.08;
+      return { lat: 14.5995 + j(), lng: 120.9842 + j(), city: 'localhost', country: 'LAN' };
+    }
+    try {
+      const r = await fetch(`https://ipapi.co/${ip}/json/`);
+      const d = await r.json();
+      if (d.latitude && d.longitude)
+        return { lat: +d.latitude, lng: +d.longitude, city: d.city || 'Unknown', country: d.country_name || 'Unknown' };
+    } catch (_) {}
+    return { lat: (Math.random() * 120) - 60, lng: (Math.random() * 320) - 160, city: 'Unknown', country: 'Unknown' };
+  }
+
+  function status(s) {
+    return (s.Status || s.status || 'unknown').toLowerCase();
+  }
+
+  function setPill(state, label) {
+    document.getElementById('ssePill').className = 'sse-pill ' + state;
+    document.getElementById('sseLabel').textContent = label;
+  }
+
+  function relativeTime(ts) {
+    const d = Math.floor((Date.now() - ts) / 1000);
+    if (d < 5) return 'just now';
+    if (d < 60) return d + 's ago';
+    if (d < 3600) return Math.floor(d / 60) + 'm ago';
+    return Math.floor(d / 3600) + 'h ago';
+  }
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  setInterval(() => {
+    if (sessions.length > 0) {
+      sessions.forEach(s => {
+        const ip = s.Client || s.client || '';
+        if (ip && geoCache[ip] && markers[ip]) placeMarker(ip, s, geoCache[ip]);
+      });
+    }
+  }, 30000);
+
+  connect();
+</script>
+</body>
+</html>

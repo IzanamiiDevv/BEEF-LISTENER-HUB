@@ -136,8 +136,12 @@ app.get("/", (req, res) => {
   res.send(renderPage(listener));
 });
 
-app.get("/sessions", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "sessions.html"));
+app.get("/commandpanel", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "Commandpanel.html"));
+});
+
+app.get("/worldmap", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "Worldmap.html"));
 });
 
 app.get("/api/route.json", (req, res) => {

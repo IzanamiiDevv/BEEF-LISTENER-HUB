@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCCP — Command Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #07070f;
+      --bg2:     #0d0d1a;
+      --bg3:     #121220;
+      --bg4:     #181830;
+      --border:  #1e1e3a;
+      --border2: #2a2a50;
+      --purple:  #7c3aed;
+      --purple3: #c084fc;
+      --blue3:   #93c5fd;
+      --cyan2:   #22d3ee;
+      --green:   #10b981;
+      --green2:  #34d399;
+      --yellow:  #f59e0b;
+      --red:     #ef4444;
+      --red2:    #f87171;
+      --text:    #e2e8f0;
+      --text2:   #94a3b8;
+      --text3:   #475569;
+      --mono:    'Fira Code', monospace;
+    }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.5; display: flex; flex-direction: column; }
+    body::before { content: ''; position: fixed; inset: 0; background-image: linear-gradient(rgba(124,58,237,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.025) 1px, transparent 1px); background-size: 32px 32px; pointer-events: none; z-index: 0; }
+    .scanline { position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px); pointer-events: none; z-index: 9999; }
+
+    .titlebar { display: flex; align-items: center; gap: 12px; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 9px 16px; flex-shrink: 0; position: relative; z-index: 10; }
+    .tb-dots { display: flex; gap: 6px; }
+    .tb-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .tb-dot.r { background: #ff5f57; } .tb-dot.y { background: #febc2e; } .tb-dot.g { background: #28c840; }
+    .tb-title { flex: 1; text-align: center; font-size: 11px; color: var(--text3); letter-spacing: 0.15em; text-transform: uppercase; }
+    .tb-title span { color: var(--purple3); }
+    .tb-nav { display: flex; gap: 3px; }
+    .tb-nav a { background: transparent; border: 1px solid transparent; color: var(--text2); font-family: var(--mono); font-size: 11px; padding: 3px 12px; border-radius: 4px; cursor: pointer; letter-spacing: 0.05em; transition: all 0.15s; text-decoration: none; }
+    .tb-nav a:hover { color: var(--text); border-color: var(--border2); background: var(--bg3); }
+    .tb-nav a.active { color: var(--purple3); border-color: var(--purple); background: rgba(124,58,237,0.12); }
+
+    .layout { display: flex; flex: 1; overflow: hidden; position: relative; z-index: 1; }
+
+    .sidebar { width: 210px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .sb-hdr { padding: 11px 14px 9px; border-bottom: 1px solid var(--border); }
+    .sb-lbl { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text3); margin-bottom: 2px; }
+    .sb-ttl { font-size: 12px; color: var(--purple3); font-weight: 600; }
+    .sb-sec { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+    .sb-sec-ttl { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3); margin-bottom: 7px; }
+    .sb-stat { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+    .sb-stat-k { font-size: 11px; color: var(--text2); }
+    .sb-stat-v { font-size: 13px; font-weight: 700; }
+    .v-green { color: var(--green2); } .v-purple { color: var(--purple3); } .v-yellow { color: var(--yellow); } .v-red { color: var(--red2); } .v-cyan { color: var(--cyan2); }
+    .watch-scroll { flex: 1; overflow-y: auto; padding: 8px 14px; }
+    .watch-item { display: flex; align-items: center; gap: 7px; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+    .watch-item:last-child { border-bottom: none; }
+    .wd { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); flex-shrink: 0; animation: pulse 2s infinite; }
+    .wid { color: var(--text3); width: 18px; flex-shrink: 0; }
+    .wip { color: var(--yellow); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wrm { color: var(--text3); cursor: pointer; font-size: 10px; transition: color 0.15s; }
+    .wrm:hover { color: var(--red2); }
+    .sb-empty { color: var(--text3); font-size: 11px; padding: 4px 0; }
+
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .main-hdr { padding: 9px 16px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .mh-prompt { display: flex; align-items: center; gap: 4px; font-size: 11px; flex-shrink: 0; }
+    .pu { color: var(--green2); } .ph { color: var(--blue3); } .pp { color: var(--purple3); }
+    .sse-pill { display: flex; align-items: center; gap: 5px; font-size: 10px; padding: 3px 9px; border-radius: 3px; border: 1px solid; }
+    .sse-pill.connected { color: var(--green2); border-color: rgba(52,211,153,0.3); background: rgba(16,185,129,0.05); }
+    .sse-pill.disconnected { color: var(--red2); border-color: rgba(248,113,113,0.3); background: rgba(239,68,68,0.05); }
+    .sse-pill.reconnecting { color: var(--yellow); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05); }
+    .sse-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .sse-pill.connected .sse-dot { animation: pulse 1.4s step-end infinite; }
+    .sse-pill.reconnecting .sse-dot { animation: pulse 0.6s step-end infinite; }
+
+    .filter-bar { padding: 7px 16px; background: var(--bg3); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .filter-label { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; }
+    .filter-wrap { flex: 1; }
+    #filterInput { width: 100%; background: var(--bg2); border: 1px solid var(--border2); border-radius: 3px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 5px 10px; outline: none; transition: border-color 0.2s; }
+    #filterInput:focus { border-color: var(--purple); }
+    #filterInput.ok { border-color: rgba(52,211,153,0.5); }
+    #filterInput.err { border-color: rgba(248,113,113,0.5); }
+    .filter-status { font-size: 10px; flex-shrink: 0; min-width: 80px; }
+    .filter-status.ok { color: var(--green2); } .filter-status.err { color: var(--red2); } .filter-status.off { color: var(--text3); }
+    .filter-clear { background: transparent; border: 1px solid var(--border2); color: var(--text3); font-family: var(--mono); font-size: 10px; padding: 4px 9px; border-radius: 3px; cursor: pointer; transition: all 0.15s; flex-shrink: 0; opacity: 0.4; }
+    .filter-clear:hover { color: var(--red2); border-color: rgba(248,113,113,0.4); opacity: 1; }
+
+    .table-area { flex: 1; overflow-y: auto; padding: 10px 14px; }
+    .table-wrap { border: 1px solid var(--border2); border-radius: 5px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead tr { background: var(--bg3); border-bottom: 1px solid var(--border2); }
+    thead th { padding: 7px 13px; text-align: left; font-size: 9px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3); white-space: nowrap; }
+    thead th:first-child { width: 30px; text-align: center; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; cursor: default; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(124,58,237,0.05); }
+    tbody tr.watched { background: rgba(245,158,11,0.04); }
+    tbody tr.watched:hover { background: rgba(245,158,11,0.08); }
+    tbody tr.watched .col-client { color: var(--yellow); }
+    td { padding: 8px 13px; color: var(--text); vertical-align: middle; }
+    td.col-idx { color: var(--text3); text-align: center; font-size: 11px; }
+    td.col-from { color: var(--blue3); }
+    td.col-client { font-weight: 500; font-variant-numeric: tabular-nums; }
+    td.col-ls { color: var(--text2); font-size: 11px; }
+    td.col-key { color: var(--purple3); cursor: pointer; max-width: 150px; user-select: none; }
+    td.col-key .kv { display: inline-block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    td.col-key .kh { font-size: 10px; color: var(--text3); margin-left: 5px; opacity: 0; transition: opacity 0.15s; vertical-align: middle; }
+    td.col-key:hover .kh { opacity: 1; }
+    td.col-key:hover .kv { color: var(--cyan2); }
+    td.col-key.copied .kv { color: var(--green2); }
+    td.col-key.copied .kh { opacity: 1; color: var(--green2); }
+    .watch-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); padding: 1px 5px; border-radius: 2px; margin-left: 5px; vertical-align: middle; }
+    .watch-badge::before { content: '◆'; font-size: 6px; }
+    .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; border: 1px solid currentColor; }
+    .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .badge-active { color: var(--green2); background: rgba(52,211,153,0.08); }
+    .badge-idle { color: var(--yellow); background: rgba(245,158,11,0.08); }
+    .badge-dead { color: var(--red2); background: rgba(248,113,113,0.08); }
+    .badge-unknown { color: var(--text2); background: rgba(148,163,184,0.08); }
+    tbody tr.row-enter { animation: rowIn 0.25s ease both; }
+
+    .empty-state { padding: 28px 0 28px 16px; color: var(--text3); font-size: 12px; }
+
+    .ctx-menu { position: fixed; background: var(--bg3); border: 1px solid var(--border2); border-radius: 5px; padding: 4px 0; z-index: 50000; min-width: 180px; display: none; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+    .ctx-menu.visible { display: block; }
+    .ctx-item { display: flex; align-items: center; gap: 8px; padding: 7px 14px; font-size: 11px; color: var(--text2); cursor: pointer; transition: background 0.1s; }
+    .ctx-item:hover { background: rgba(124,58,237,0.12); color: var(--text); }
+    .ctx-sep { height: 1px; background: var(--border); margin: 3px 0; }
+    .ctx-header { padding: 5px 14px; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3); }
+    .ci { color: var(--purple3); font-size: 10px; width: 14px; text-align: center; }
+
+    .output-area { border-top: 1px solid var(--border); background: #04040a; max-height: 110px; overflow-y: auto; flex-shrink: 0; }
+    .output-line { display: flex; align-items: flex-start; gap: 9px; padding: 3px 14px; font-size: 11px; border-bottom: 1px solid rgba(30,30,58,0.4); animation: fadeIn 0.15s ease; }
+    .output-line.cmd { color: var(--text2); } .output-line.ok { color: var(--green2); } .output-line.err { color: var(--red2); } .output-line.info { color: var(--blue3); } .output-line.warn { color: var(--yellow); } .output-line.sys { color: var(--purple3); }
+    .ol-pre { color: var(--text3); flex-shrink: 0; font-size: 10px; }
+
+    .cmd-area { border-top: 1px solid var(--border); background: var(--bg2); flex-shrink: 0; position: relative; }
+    .suggestions { position: absolute; bottom: 100%; left: 0; right: 0; background: var(--bg3); border: 1px solid var(--border2); border-bottom: none; border-radius: 5px 5px 0 0; overflow: hidden; display: none; }
+    .suggestions.visible { display: block; }
+    .sg-hdr { padding: 4px 12px; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3); border-bottom: 1px solid var(--border); }
+    .sg-item { display: flex; align-items: center; gap: 10px; padding: 6px 12px; cursor: pointer; transition: background 0.1s; }
+    .sg-item:hover, .sg-item.active { background: rgba(124,58,237,0.12); }
+    .sg-item.active { border-left: 2px solid var(--purple); }
+    .sg-cmd { color: var(--purple3); font-size: 12px; min-width: 160px; }
+    .sg-desc { color: var(--text3); font-size: 11px; }
+    .cmd-row { display: flex; align-items: center; padding: 9px 14px; gap: 8px; }
+    .cmd-prompt { display: flex; align-items: center; gap: 4px; font-size: 12px; flex-shrink: 0; }
+    #cmdInput { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: var(--mono); font-size: 13px; caret-color: var(--purple3); }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(4,4,10,0.88); display: none; align-items: center; justify-content: center; z-index: 40000; }
+    .modal-overlay.visible { display: flex; }
+    .modal { background: var(--bg3); border: 1px solid var(--border2); border-radius: 7px; padding: 22px; width: 480px; max-width: 90vw; }
+    .modal-ttl { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--purple3); margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+    .modal-ttl::before { content: '◆'; font-size: 8px; }
+    .modal-lbl { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
+    .modal-box { background: var(--bg2); border: 1px solid var(--border2); border-radius: 3px; padding: 10px 12px; font-family: var(--mono); font-size: 12px; color: var(--cyan2); word-break: break-all; line-height: 1.6; margin-bottom: 13px; min-height: 44px; }
+    .modal-info { font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+    .modal-btns { display: flex; gap: 7px; justify-content: flex-end; }
+    .modal-btn { background: transparent; border: 1px solid var(--border2); color: var(--text2); font-family: var(--mono); font-size: 11px; padding: 6px 14px; border-radius: 3px; cursor: pointer; transition: all 0.15s; }
+    .modal-btn:hover { background: var(--bg4); color: var(--text); }
+    .modal-btn.primary { background: rgba(124,58,237,0.12); color: var(--purple3); border-color: var(--purple); }
+    .modal-btn.primary:hover { background: rgba(124,58,237,0.22); }
+    .modal-btn.primary.copied { background: rgba(16,185,129,0.12); color: var(--green2); border-color: var(--green); }
+
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+    @keyframes rowIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: none; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+<div class="scanline"></div>
+
+<div class="titlebar">
+  <div class="tb-dots"><div class="tb-dot r"></div><div class="tb-dot y"></div><div class="tb-dot g"></div></div>
+  <div class="tb-title"><span>CENTRAL CYBER COMMAND PANEL</span> &nbsp;·&nbsp; v2.0.0</div>
+  <div class="tb-nav">
+    <a href="/CommandPanel.html" class="active">Command Panel</a>
+    <a href="/WorldMap.html">World Map</a>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-hdr">
+      <div class="sb-lbl">control</div>
+      <div class="sb-ttl">CCCP // Panel</div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-sec-ttl">session stats</div>
+      <div class="sb-stat"><span class="sb-stat-k">total</span><span class="sb-stat-v v-purple" id="statTotal">0</span></div>
+      <div class="sb-stat"><span class="sb-stat-k">active</span><span class="sb-stat-v v-green" id="statActive">0</span></div>
+      <div class="sb-stat"><span class="sb-stat-k">idle</span><span class="sb-stat-v v-yellow" id="statIdle">0</span></div>
+      <div class="sb-stat"><span class="sb-stat-k">watched</span><span class="sb-stat-v v-red" id="statWatched">0</span></div>
+    </div>
+    <div class="sb-sec" style="padding-bottom:6px;">
+      <div class="sb-sec-ttl">watch list</div>
+    </div>
+    <div class="watch-scroll" id="watchScroll">
+      <div class="sb-empty" id="watchEmpty">// no watches active</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="main-hdr">
+      <div class="mh-prompt">
+        <span class="pu">root</span><span style="color:var(--text3)">@</span><span class="ph">cccp</span><span style="color:var(--text3)">:</span><span class="pp">~/sessions</span><span style="color:var(--text)">$</span>
+      </div>
+      <div class="sse-pill reconnecting" id="ssePill">
+        <div class="sse-dot"></div><span id="sseLabel">connecting…</span>
+      </div>
+      <span style="margin-left:auto;font-size:10px;color:var(--text3);" id="lastUpdate"></span>
+    </div>
+
+    <div class="filter-bar">
+      <span class="filter-label">Filter</span>
+      <div class="filter-wrap">
+        <input type="text" id="filterInput" placeholder='from == "youtube.com" && client == "192.168.1.1" && status == "active"' autocomplete="off" spellcheck="false"/>
+      </div>
+      <span class="filter-status off" id="filterStatus">no filter</span>
+      <button class="filter-clear" id="filterClearBtn" onclick="clearFilter()">✕ clear</button>
+    </div>
+
+    <div class="table-area">
+      <div class="table-wrap">
+        <table id="sessionTable">
+          <thead>
+            <tr><th>#</th><th>From</th><th>Client</th><th>Key</th><th>Status</th><th>Last Seen</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState">
+          <span style="color:var(--purple3)">$</span> tail -f sessions.json <span style="color:var(--text3)">— no active sessions —</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="output-area" id="outputArea"></div>
+
+    <div class="cmd-area">
+      <div class="suggestions" id="suggestions">
+        <div class="sg-hdr">suggestions</div>
+        <div id="sgList"></div>
+      </div>
+      <div class="cmd-row">
+        <div class="cmd-prompt">
+          <span class="pu">root</span><span style="color:var(--text3)">@</span><span class="ph">cccp</span><span style="color:var(--text3)">:</span><span class="pp">~/sessions</span><span style="color:var(--text)">$</span>
+        </div>
+        <input type="text" id="cmdInput" placeholder="type a command or 'help'…" autocomplete="off" spellcheck="false"/>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-header" id="ctxHeader">session</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" id="ctxWatch"   onclick="ctxAction('watch')">  <span class="ci">◆</span> Watch IP</div>
+  <div class="ctx-item" id="ctxUnwatch" onclick="ctxAction('unwatch')" style="display:none"><span class="ci">◇</span> Unwatch IP</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxAction('copyip')"> <span class="ci">⧉</span> Copy IP</div>
+  <div class="ctx-item" onclick="ctxAction('copykey')"><span class="ci">⧉</span> Copy Key</div>
+  <div class="ctx-item" onclick="ctxAction('map')">    <span class="ci">⊕</span> View on Map</div>
+</div>
+
+<div class="modal-overlay" id="hashModal" onclick="if(event.target===this)closeHash()">
+  <div class="modal">
+    <div class="modal-ttl">Hash Output</div>
+    <div class="modal-lbl">input</div>
+    <div class="modal-info" id="hashInfo"></div>
+    <div class="modal-lbl">xor + base64 encoded</div>
+    <div class="modal-box" id="hashOut"></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeHash()">close</button>
+      <button class="modal-btn primary" id="hashCopyBtn" onclick="copyHash()">copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const COMMANDS = [
+    { cmd: 'watch <ip>',       short: 'watch',        desc: 'highlight and track a suspect IP' },
+    { cmd: 'unwatch <ip|id>',  short: 'unwatch',      desc: 'remove IP from watch list' },
+    { cmd: 'watch list',       short: 'watch list',   desc: 'show all watched IPs' },
+    { cmd: 'filter <expr>',    short: 'filter',       desc: 'set Wireshark-style filter expression' },
+    { cmd: 'filter clear',     short: 'filter clear', desc: 'clear active filter' },
+    { cmd: 'hash <text>',      short: 'hash',         desc: 'XOR+base64 encode text' },
+    { cmd: 'clear',            short: 'clear',        desc: 'clear output console' },
+    { cmd: 'help',             short: 'help',         desc: 'list all commands' },
+  ];
+
+  let sessions = [];
+  let watchedIPs = {};
+  let watchCounter = 1;
+  let eventSource = null;
+  let cmdHistory = [];
+  let histIdx = -1;
+  let selectedSg = -1;
+  let filterExpr = '';
+  let ctxSession = null;
+
+  const outputArea  = document.getElementById('outputArea');
+  const tableBody   = document.getElementById('tableBody');
+  const emptyState  = document.getElementById('emptyState');
+  const cmdInput    = document.getElementById('cmdInput');
+  const sgEl        = document.getElementById('suggestions');
+  const sgList      = document.getElementById('sgList');
+  const ctxMenu     = document.getElementById('ctxMenu');
+  const filterInput = document.getElementById('filterInput');
+
+  function connect() {
+    setPill('reconnecting', 'connecting…');
+    eventSource = new EventSource('/api/sessions/stream');
+    eventSource.addEventListener('sessions', e => { handleUpdate(JSON.parse(e.data)); setPill('connected', 'stream live'); });
+    eventSource.addEventListener('open', () => setPill('connected', 'stream live'));
+    eventSource.onerror = () => { setPill('disconnected', 'disconnected'); eventSource.close(); setTimeout(connect, 3000); };
+  }
+
+  function handleUpdate(incoming) {
+    const oldIds = sessions.map(s => JSON.stringify(s));
+    sessions = incoming;
+    renderTable(sessions, oldIds);
+    updateStats(sessions);
+    document.getElementById('lastUpdate').textContent = '· ' + new Date().toLocaleTimeString();
+  }
+
+  function applyFilter(data) {
+    if (!filterExpr) return data;
+    try {
+      const expr = filterExpr
+        .replace(/from\s*==\s*["']([^"']+)["']/gi, (_, v) => `(String(s.FROM||s.from||'').toLowerCase().includes('${v.toLowerCase()}'))`)
+        .replace(/client\s*==\s*["']([^"']+)["']/gi, (_, v) => `(String(s.Client||s.client||'').toLowerCase().includes('${v.toLowerCase()}'))`)
+        .replace(/status\s*==\s*["']([^"']+)["']/gi, (_, v) => `(String(s.Status||s.status||'').toLowerCase()==='${v.toLowerCase()}')`)
+        .replace(/key\s*==\s*["']([^"']+)["']/gi, (_, v) => `(String(s.KEY||s.key||'').toLowerCase().includes('${v.toLowerCase()}'))`);
+      const fn = new Function('s', `try { return !!(${expr}); } catch(e) { return false; }`);
+      return data.filter(fn);
+    } catch (_) { return data; }
+  }
+
+  function validateFilter(expr) {
+    if (!expr) return true;
+    try {
+      const e = expr
+        .replace(/from\s*==\s*["'][^"']*["']/gi, 'true')
+        .replace(/client\s*==\s*["'][^"']*["']/gi, 'true')
+        .replace(/status\s*==\s*["'][^"']*["']/gi, 'true')
+        .replace(/key\s*==\s*["'][^"']*["']/gi, 'true');
+      new Function(`return !!(${e})`);
+      return true;
+    } catch (_) { return false; }
+  }
+
+  function renderTable(data, oldIds) {
+    const visible = applyFilter(data);
+    if (visible.length === 0) {
+      tableBody.innerHTML = '';
+      emptyState.style.display = 'block';
+      emptyState.innerHTML = filterExpr
+        ? `<span style="color:var(--purple3)">$</span> <span style="color:var(--text3)">filter matched 0 sessions — "${esc(filterExpr)}"</span>`
+        : `<span style="color:var(--purple3)">$</span> <span style="color:var(--text3)">tail -f sessions.json — no active sessions —</span>`;
+      return;
+    }
+    emptyState.style.display = 'none';
+    const frag = document.createDocumentFragment();
+    visible.forEach((s, idx) => {
+      const key = JSON.stringify(s);
+      const isNew = !oldIds.includes(key);
+      const ip = s.Client || s.client || '';
+      const isWatched = !!watchedIPs[ip];
+      const tr = document.createElement('tr');
+      if (isWatched) tr.classList.add('watched');
+      if (isNew) tr.classList.add('row-enter');
+      tr.dataset.ip = ip;
+      tr.dataset.session = JSON.stringify(s);
+      tr.addEventListener('contextmenu', showCtxMenu);
+      const wBadge = isWatched ? `<span class="watch-badge">WATCH #${watchedIPs[ip].id}</span>` : '';
+      const ls = s.lastSeen ? relativeTime(s.lastSeen) : '—';
+      const keyVal = String(s.KEY || s.key || '—');
+      tr.innerHTML = `
+        <td class="col-idx">${idx + 1}</td>
+        <td class="col-from">${esc(s.FROM || s.from || '—')}</td>
+        <td class="col-client">${esc(ip)}${wBadge}</td>
+        <td class="col-key" onclick="copyKey(this,'${esc(keyVal).replace(/'/g,"\\'")}')"><span class="kv">${esc(keyVal)}</span><span class="kh">[copy]</span></td>
+        <td>${statusBadge(String(s.Status || s.status || 'unknown'))}</td>
+        <td class="col-ls">${ls}</td>`;
+      frag.appendChild(tr);
+    });
+    tableBody.innerHTML = '';
+    tableBody.appendChild(frag);
+  }
+
+  function statusBadge(v) {
+    const m = { active: 'badge-active', idle: 'badge-idle', dead: 'badge-dead' };
+    return `<span class="badge ${m[v.toLowerCase()] || 'badge-unknown'}">${esc(v)}</span>`;
+  }
+
+  function updateStats(data) {
+    setStat('statTotal',   data.length);
+    setStat('statActive',  data.filter(s => (s.Status||s.status||'').toLowerCase() === 'active').length);
+    setStat('statIdle',    data.filter(s => (s.Status||s.status||'').toLowerCase() === 'idle').length);
+    setStat('statWatched', Object.keys(watchedIPs).length);
+    renderWatchList();
+  }
+
+  function setStat(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
+
+  function renderWatchList() {
+    const scroll = document.getElementById('watchScroll');
+    const empty  = document.getElementById('watchEmpty');
+    const entries = Object.entries(watchedIPs);
+    if (entries.length === 0) { empty.style.display = 'block'; Array.from(scroll.querySelectorAll('.watch-item')).forEach(e => e.remove()); return; }
+    empty.style.display = 'none';
+    scroll.innerHTML = '';
+    entries.forEach(([ip, info]) => {
+      const d = document.createElement('div');
+      d.className = 'watch-item';
+      d.innerHTML = `<span class="wd"></span><span class="wid">#${info.id}</span><span class="wip" title="${esc(ip)}">${esc(ip)}</span><span class="wrm" onclick="execUnwatch('${esc(ip)}')">✕</span>`;
+      scroll.appendChild(d);
+    });
+  }
+
+  function setPill(state, label) {
+    document.getElementById('ssePill').className = 'sse-pill ' + state;
+    document.getElementById('sseLabel').textContent = label;
+  }
+
+  function relativeTime(ts) {
+    const d = Math.floor((Date.now() - ts) / 1000);
+    if (d < 5) return 'just now';
+    if (d < 60) return d + 's ago';
+    if (d < 3600) return Math.floor(d / 60) + 'm ago';
+    return Math.floor(d / 3600) + 'h ago';
+  }
+
+  function copyKey(cell, val) {
+    navigator.clipboard.writeText(val).then(() => {
+      cell.classList.add('copied');
+      cell.querySelector('.kh').textContent = '[copied!]';
+      setTimeout(() => { cell.classList.remove('copied'); cell.querySelector('.kh').textContent = '[copy]'; }, 2000);
+    });
+  }
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function printOutput(type, text) {
+    const d = document.createElement('div');
+    d.className = 'output-line ' + type;
+    const pre = { cmd:'>', ok:'✓', err:'✗', info:'i', warn:'!', sys:'◆' }[type] || '·';
+    d.innerHTML = `<span class="ol-pre">${pre}</span><span>${esc(text)}</span>`;
+    outputArea.appendChild(d);
+    outputArea.scrollTop = outputArea.scrollHeight;
+  }
+
+  function showCtxMenu(e) {
+    e.preventDefault();
+    const tr = e.currentTarget;
+    const ip = tr.dataset.ip;
+    ctxSession = { ip, session: JSON.parse(tr.dataset.session || '{}') };
+    document.getElementById('ctxHeader').textContent = ip || 'session';
+    document.getElementById('ctxWatch').style.display   = watchedIPs[ip] ? 'none' : 'flex';
+    document.getElementById('ctxUnwatch').style.display = watchedIPs[ip] ? 'flex' : 'none';
+    ctxMenu.style.left = Math.min(e.clientX, window.innerWidth - 200) + 'px';
+    ctxMenu.style.top  = Math.min(e.clientY, window.innerHeight - 180) + 'px';
+    ctxMenu.classList.add('visible');
+  }
+
+  function ctxAction(action) {
+    if (!ctxSession) return;
+    const { ip, session } = ctxSession;
+    if (action === 'watch')   execWatch(ip);
+    else if (action === 'unwatch') execUnwatch(ip);
+    else if (action === 'copyip')  navigator.clipboard.writeText(ip).then(() => printOutput('ok', `copied: ${ip}`));
+    else if (action === 'copykey') navigator.clipboard.writeText(String(session.KEY || session.key || '')).then(() => printOutput('ok', 'key copied'));
+    else if (action === 'map') window.location.href = '/WorldMap.html?highlight=' + encodeURIComponent(ip);
+    hideCtx();
+  }
+
+  function hideCtx() { ctxMenu.classList.remove('visible'); ctxSession = null; }
+
+  document.addEventListener('click', e => { if (!e.target.closest('.ctx-menu')) hideCtx(); if (!e.target.closest('.cmd-area')) hideSg(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtx(); });
+
+  filterInput.addEventListener('input', () => {
+    const v = filterInput.value.trim();
+    const status = document.getElementById('filterStatus');
+    if (!v) { filterExpr = ''; filterInput.className = ''; status.className = 'filter-status off'; status.textContent = 'no filter'; document.getElementById('filterClearBtn').style.opacity = '0.4'; renderTable(sessions, []); return; }
+    const valid = validateFilter(v);
+    filterInput.className = valid ? 'ok' : 'err';
+    document.getElementById('filterClearBtn').style.opacity = '1';
+    if (valid) { filterExpr = v; status.className = 'filter-status ok'; status.textContent = applyFilter(sessions).length + ' match(es)'; renderTable(sessions, []); }
+    else { status.className = 'filter-status err'; status.textContent = 'syntax error'; }
+  });
+
+  function clearFilter() {
+    filterInput.value = ''; filterExpr = ''; filterInput.className = '';
+    document.getElementById('filterStatus').className = 'filter-status off';
+    document.getElementById('filterStatus').textContent = 'no filter';
+    document.getElementById('filterClearBtn').style.opacity = '0.4';
+    renderTable(sessions, []);
+    printOutput('info', 'filter cleared');
+  }
+
+  function execWatch(ip) {
+    if (!ip) { printOutput('err', 'usage: watch <ip>'); return; }
+    if (watchedIPs[ip]) { printOutput('warn', `${ip} already watched`); return; }
+    watchedIPs[ip] = { id: watchCounter++ };
+    renderTable(sessions, []); renderWatchList(); setStat('statWatched', Object.keys(watchedIPs).length);
+    printOutput('ok', `watching ${ip} → #${watchedIPs[ip].id}`);
+  }
+
+  function execUnwatch(ipOrId) {
+    if (!ipOrId) { printOutput('err', 'usage: unwatch <ip|id>'); return; }
+    const byId = ipOrId.replace('#', '');
+    let found = watchedIPs[ipOrId] ? ipOrId : null;
+    if (!found) for (const [k, v] of Object.entries(watchedIPs)) if (String(v.id) === byId) { found = k; break; }
+    if (!found) { printOutput('err', `no watch for "${ipOrId}"`); return; }
+    delete watchedIPs[found];
+    renderTable(sessions, []); renderWatchList(); setStat('statWatched', Object.keys(watchedIPs).length);
+    printOutput('ok', `stopped watching ${found}`);
+  }
+
+  function execWatchList() {
+    const e = Object.entries(watchedIPs);
+    if (!e.length) { printOutput('info', 'watch list is empty'); return; }
+    printOutput('info', `watch list — ${e.length} entries:`);
+    e.forEach(([ip, info]) => printOutput('sys', `  #${info.id}  ${ip}`));
+  }
+
+  function execHash(text) {
+    if (!text) { printOutput('err', 'usage: hash <text>'); return; }
+    const k = 'cccp'; let r = '';
+    for (let i = 0; i < text.length; i++) r += String.fromCharCode(text.charCodeAt(i) ^ k.charCodeAt(i % k.length));
+    document.getElementById('hashInfo').textContent = '"' + text + '"';
+    document.getElementById('hashOut').textContent = btoa(r);
+    document.getElementById('hashModal').classList.add('visible');
+    printOutput('ok', 'hash generated');
+  }
+
+  function closeHash() {
+    document.getElementById('hashModal').classList.remove('visible');
+    const b = document.getElementById('hashCopyBtn');
+    b.textContent = 'copy to clipboard'; b.className = 'modal-btn primary';
+  }
+
+  function copyHash() {
+    navigator.clipboard.writeText(document.getElementById('hashOut').textContent).then(() => {
+      const b = document.getElementById('hashCopyBtn');
+      b.textContent = '✓ copied!'; b.className = 'modal-btn primary copied';
+      setTimeout(() => { b.textContent = 'copy to clipboard'; b.className = 'modal-btn primary'; }, 2000);
+    });
+  }
+
+  function execHelp() {
+    printOutput('sys', 'CCCP Command Reference:');
+    COMMANDS.forEach(c => printOutput('info', `  ${c.cmd.padEnd(22)} — ${c.desc}`));
+  }
+
+  function execClear() { outputArea.innerHTML = ''; printOutput('sys', 'output cleared'); }
+
+  function processCommand(raw) {
+    const input = raw.trim();
+    if (!input) return;
+    cmdHistory.unshift(input); histIdx = -1;
+    printOutput('cmd', '$ ' + input);
+    const parts = input.split(/\s+/);
+    const c0 = parts[0].toLowerCase();
+    const c01 = (c0 + ' ' + (parts[1] || '')).trim();
+    if (c01 === 'watch list')    execWatchList();
+    else if (c0 === 'watch')     execWatch(parts.slice(1).join(' '));
+    else if (c0 === 'unwatch')   execUnwatch(parts[1]);
+    else if (c01 === 'filter clear') clearFilter();
+    else if (c0 === 'filter')    { filterInput.value = parts.slice(1).join(' '); filterInput.dispatchEvent(new Event('input')); }
+    else if (c0 === 'hash')      execHash(parts.slice(1).join(' '));
+    else if (c0 === 'help')      execHelp();
+    else if (c0 === 'clear')     execClear();
+    else printOutput('err', `unknown: ${c0} — type 'help'`);
+  }
+
+  function updateSg(v) {
+    const val = v.trim().toLowerCase();
+    if (!val) { hideSg(); return; }
+    const matches = COMMANDS.filter(c => c.cmd.toLowerCase().startsWith(val) || c.short.toLowerCase().startsWith(val));
+    if (!matches.length) { hideSg(); return; }
+    sgList.innerHTML = ''; selectedSg = -1;
+    matches.slice(0, 6).forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'sg-item'; d.dataset.cmd = c.short;
+      d.innerHTML = `<span class="sg-cmd">${esc(c.cmd)}</span><span class="sg-desc">${esc(c.desc)}</span>`;
+      d.onclick = () => { cmdInput.value = c.short + ' '; hideSg(); cmdInput.focus(); };
+      sgList.appendChild(d);
+    });
+    sgEl.classList.add('visible');
+  }
+
+  function hideSg() { sgEl.classList.remove('visible'); selectedSg = -1; }
+
+  function navSg(dir) {
+    const items = sgList.querySelectorAll('.sg-item');
+    if (!items.length) return;
+    items.forEach(i => i.classList.remove('active'));
+    selectedSg = Math.max(-1, Math.min(items.length - 1, selectedSg + dir));
+    if (selectedSg >= 0) { items[selectedSg].classList.add('active'); cmdInput.value = items[selectedSg].dataset.cmd + ' '; }
+  }
+
+  cmdInput.addEventListener('input', () => { updateSg(cmdInput.value); histIdx = -1; });
+  cmdInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); const v = cmdInput.value; hideSg(); cmdInput.value = ''; processCommand(v); }
+    else if (e.key === 'Tab') { e.preventDefault(); const i = sgList.querySelectorAll('.sg-item'); if (i.length) { cmdInput.value = i[selectedSg >= 0 ? selectedSg : 0].dataset.cmd + ' '; hideSg(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sgEl.classList.contains('visible') ? navSg(-1) : (histIdx = Math.min(histIdx+1, cmdHistory.length-1), cmdHistory[histIdx] !== undefined && (cmdInput.value = cmdHistory[histIdx])); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); sgEl.classList.contains('visible') ? navSg(1) : (histIdx = Math.max(histIdx-1,-1), cmdInput.value = histIdx>=0?cmdHistory[histIdx]:''); }
+    else if (e.key === 'Escape') hideSg();
+  });
+
+  printOutput('sys', 'Central Cyber Command Panel v2.0 initialized');
+  printOutput('info', "right-click any session row for quick actions");
+  printOutput('info', 'filter syntax: from == "domain.com" && client == "1.2.3.4"');
+  connect();
+
+  setInterval(() => { if (sessions.length > 0) renderTable(sessions, sessions.map(s => JSON.stringify(s))); }, 30000);
+</script>
+</body>
+</html>
