@@ -75,7 +75,3 @@ function getListener() {
 }
 
 const timer = getListener();
-
-window.addEventListener("beforeunload", () => {
-    console.log("PAGE RELOAD DETECTED");
-});

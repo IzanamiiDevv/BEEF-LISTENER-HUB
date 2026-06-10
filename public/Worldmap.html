@@ -233,7 +233,8 @@
         <div class="legend-row"><div class="legend-icon"><div class="leg-dot idle"></div></div>idle session</div>
         <div class="legend-row"><div class="legend-icon"><div class="leg-circle active"></div></div>location radius (active)</div>
         <div class="legend-row"><div class="legend-icon"><div class="leg-circle idle"></div></div>location radius (idle)</div>
-        <div class="legend-row" style="color:var(--text3);font-size:10px;padding-top:4px;border-top:1px solid var(--border);margin-top:2px;">IP geolocation is approximate.<br>Circle = uncertainty radius.</div>
+        <div class="legend-row" style="color:var(--text3);font-size:10px;padding-top:4px;border-top:1px solid var(--border);margin-top:2px;">IP geolocation is approximate.<br>Circle = uncertainty radius (~80km).</div>
+        <button onclick="clearGeoCache()" style="margin-top:6px;background:transparent;border:1px solid var(--border2);color:var(--text3);font-family:var(--mono);font-size:9px;padding:4px 8px;border-radius:3px;cursor:pointer;width:100%;letter-spacing:0.05em;transition:all 0.15s;" onmouseover="this.style.color='var(--red2)';this.style.borderColor='rgba(248,113,113,0.4)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)'">✕ clear geo cache</button>
       </div>
     </div>
 
@@ -267,12 +268,23 @@
   const highlightIP = new URLSearchParams(window.location.search).get('highlight') || null;
 
   let sessions = [];
-  let geoCache = {};
   let markers = {};
   let circles = {};
   let eventSource = null;
   let geoQueue = [];
   let geoProcessing = false;
+
+  const GEO_STORE_KEY = 'cccp_geo_cache';
+
+  function loadGeoCache() {
+    try { return JSON.parse(localStorage.getItem(GEO_STORE_KEY) || '{}'); } catch (_) { return {}; }
+  }
+
+  function saveGeoCache(cache) {
+    try { localStorage.setItem(GEO_STORE_KEY, JSON.stringify(cache)); } catch (_) {}
+  }
+
+  let geoCache = loadGeoCache();
 
   function connect() {
     setPill('reconnecting', 'connecting to stream…');
@@ -354,6 +366,7 @@
       const ip = geoQueue.shift();
       const geo = await geolocate(ip);
       geoCache[ip] = geo;
+      saveGeoCache(geoCache);
       const session = sessions.find(s => (s.Client || s.client) === ip);
       if (session) placeMarker(ip, session, geo);
       document.getElementById('statGeo').textContent = Object.keys(geoCache).length;
@@ -395,6 +408,11 @@
     const ls      = session.lastSeen ? relativeTime(session.lastSeen) : '—';
     const stColor = { active: 'green', idle: 'yellow', dead: 'red' }[st] || '';
 
+    const regionLine = geo.region ? `${esc(geo.region)}, ` : '';
+    const ispLine    = geo.isp    ? `<div class="popup-row"><span class="popup-k">isp</span><span class="popup-v">${esc(geo.isp)}</span></div>` : '';
+    const geoWarn    = geo.failed ? `<div style="color:var(--yellow2);font-size:10px;margin-top:6px;">⚠ geolocation failed — position approximate</div>` : '';
+    const cachedNote = `<span style="color:var(--text3);font-size:9px;"> · cached</span>`;
+
     const popupHtml = `
       <div class="popup-box">
         <div class="popup-ip">
@@ -405,9 +423,11 @@
         <div class="popup-row"><span class="popup-k">key</span><span class="popup-v">${esc(keyDisp)}</span></div>
         <div class="popup-row"><span class="popup-k">status</span><span class="popup-v ${stColor}">${st}</span></div>
         <div class="popup-row"><span class="popup-k">last seen</span><span class="popup-v">${ls}</span></div>
+        ${ispLine}
         <div class="popup-geo">
-          📍 ${esc(geo.city)}, ${esc(geo.country)}<br>
+          📍 ${regionLine}${esc(geo.city)}, ${esc(geo.country)}${cachedNote}<br>
           <span style="color:var(--text3)">${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)} · ~80km radius</span>
+          ${geoWarn}
         </div>
       </div>`;
 
@@ -434,22 +454,33 @@
   }
 
   async function geolocate(ip) {
-    const isLocal = ip === '127.0.0.1' || ip === 'localhost' || ip.startsWith('192.168.') || ip.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
-    if (isLocal) {
-      const j = () => (Math.random() - 0.5) * 0.08;
-      return { lat: 14.5995 + j(), lng: 120.9842 + j(), city: 'localhost', country: 'LAN' };
-    }
+    const isLocal =
+      ip === '127.0.0.1' || ip === 'localhost' ||
+      ip.startsWith('192.168.') || ip.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ||
+      ip === '::1';
+    if (isLocal)
+      return { lat: 14.5995, lng: 120.9842, city: 'localhost', country: 'LAN', fixed: true };
+
     try {
-      const r = await fetch(`https://ipapi.co/${ip}/json/`);
+      const r = await fetch(`http://ip-api.com/json/${ip}?fields=status,lat,lon,city,country,regionName,isp`);
       const d = await r.json();
-      if (d.latitude && d.longitude)
-        return { lat: +d.latitude, lng: +d.longitude, city: d.city || 'Unknown', country: d.country_name || 'Unknown' };
+      if (d.status === 'success' && d.lat && d.lon)
+        return { lat: d.lat, lng: d.lon, city: d.city || 'Unknown', country: d.country || 'Unknown', region: d.regionName || '', isp: d.isp || '' };
     } catch (_) {}
-    return { lat: (Math.random() * 120) - 60, lng: (Math.random() * 320) - 160, city: 'Unknown', country: 'Unknown' };
+
+    try {
+      const r2 = await fetch(`https://freeipapi.com/api/json/${ip}`);
+      const d2 = await r2.json();
+      if (d2.latitude && d2.longitude)
+        return { lat: +d2.latitude, lng: +d2.longitude, city: d2.cityName || 'Unknown', country: d2.countryName || 'Unknown', region: '', isp: '' };
+    } catch (_) {}
+
+    return { lat: 0, lng: 0, city: 'Unresolved', country: 'Unknown', region: '', isp: '', failed: true };
   }
 
   function status(s) {
-    return (s.Status || s.status || 'unknown').toLowerCase();
+    return (s.STATUS || s.Status || s.status || 'unknown').toLowerCase();
   }
 
   function setPill(state, label) {
@@ -466,6 +497,19 @@
   }
 
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function clearGeoCache() {
+    localStorage.removeItem(GEO_STORE_KEY);
+    geoCache = {};
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    Object.values(circles).forEach(c => map.removeLayer(c));
+    markers = {};
+    circles = {};
+    geoQueue = [];
+    geoProcessing = false;
+    document.getElementById('statGeo').textContent = '0';
+    syncMarkers(sessions);
+  }
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   setInterval(() => {
