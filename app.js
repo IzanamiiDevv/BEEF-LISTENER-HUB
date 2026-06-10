@@ -241,6 +241,127 @@ app.post("/api/set-listener", (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GEO PROXY  —  paste this block into server.js
+//
+// Requires node-fetch v2 if you are on Node < 18:
+//   npm install node-fetch@2
+//
+// On Node 18+ the built-in fetch is available — remove the require line below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const fetch    = require("node-fetch");   // remove if Node 18+
+const GEO_JSON = path.join(__dirname, "api", "geo-cache.json");
+
+// Bootstrap the cache file
+ensureJson(GEO_JSON, { resetAt: null, entries: {} });
+
+function loadGeoCache() {
+  try { return JSON.parse(fs.readFileSync(GEO_JSON, "utf8")); }
+  catch (_) { return { resetAt: null, entries: {} }; }
+}
+
+function saveGeoCache(cache) {
+  fs.writeFileSync(GEO_JSON, JSON.stringify(cache, null, 2));
+}
+
+// Daily noon reset — clears all cached IPs at 12:00 PM server local time
+function scheduleNoonReset() {
+  const now  = new Date();
+  const noon = new Date(now);
+  noon.setHours(12, 0, 0, 0);
+  if (now >= noon) noon.setDate(noon.getDate() + 1);
+
+  const msUntilNoon = noon - now;
+
+  setTimeout(() => {
+    const cache   = loadGeoCache();
+    cache.entries = {};
+    cache.resetAt = new Date().toISOString();
+    saveGeoCache(cache);
+    console.log("[geo-cache] daily reset at noon —", cache.resetAt);
+    scheduleNoonReset();
+  }, msUntilNoon);
+
+  console.log(`[geo-cache] next reset in ${Math.round(msUntilNoon / 60000)} min`);
+}
+
+scheduleNoonReset();
+
+app.get("/api/geo/:ip", async (req, res) => {
+  const ip = req.params.ip;
+
+  const isLocal =
+    ip === "127.0.0.1" || ip === "localhost" || ip === "::1" ||
+    ip.startsWith("192.168.") || ip.startsWith("10.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+
+  if (isLocal) {
+    return res.json({
+      lat: 14.5995, lng: 120.9842,
+      city: "localhost", country: "LAN",
+      org: "Local Network", languages: "n/a",
+      cached: false, fixed: true,
+    });
+  }
+
+  // Return from cache if present — no external request made
+  const cache = loadGeoCache();
+  if (cache.entries[ip]) {
+    console.log(`[geo-cache] HIT  ${ip}`);
+    return res.json({ ...cache.entries[ip], cached: true });
+  }
+
+  // Cache miss — fetch from ipapi.co
+  console.log(`[geo-cache] MISS ${ip} — fetching from ipapi.co`);
+  try {
+    const r = await fetch(`https://ipapi.co/${ip}/json/`, {
+      headers: { "User-Agent": "cccp-server/1.0" },
+    });
+
+    const d = await r.json();
+
+    // Detect rate-limit: HTTP 429 or error payload from ipapi.co
+    if (r.status === 429 || d.error || String(d.reason || "").toLowerCase().includes("limit")) {
+      console.warn(`[geo-cache] rate-limited for ${ip}`);
+      return res.json({
+        lat: 0, lng: 0,
+        city: "?", country: "?", org: "?", languages: "?",
+        rateLimited: true, cached: false,
+      });
+    }
+
+    if (d.latitude && d.longitude) {
+      const entry = {
+        lat:       +d.latitude,
+        lng:       +d.longitude,
+        city:      d.city         || "Unknown",
+        country:   d.country_name || "Unknown",
+        org:       d.org          || "",
+        languages: d.languages    || "",
+        cached:    false,
+      };
+
+      cache.entries[ip] = entry;
+      saveGeoCache(cache);
+
+      return res.json(entry);
+    }
+
+    return res.status(502).json({
+      lat: 0, lng: 0, city: "?", country: "?",
+      org: "?", languages: "?", failed: true, cached: false,
+    });
+
+  } catch (err) {
+    console.error(`[geo-cache] fetch error for ${ip}:`, err.message);
+    return res.status(502).json({
+      lat: 0, lng: 0, city: "?", country: "?",
+      org: "?", languages: "?", failed: true, cached: false,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`BeEF HUB → http://localhost:${PORT}`);
   console.log(`Sessions  → http://localhost:${PORT}/sessions`);
